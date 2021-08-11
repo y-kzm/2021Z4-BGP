@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
 
   /* 引数error  */
   if(argc != 2){
-    fprintf(stderr, "./sock [-hsc]\n");
+    fprintf(stderr, "./mybgp [-hsc]\n");
     return -1;
   }
   
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
         flag |= FLAG_CLIENT;
         break;
       case 'h': 
-        fprintf(stdout, "Usage: ./sock [-hsc]\n");
+        fprintf(stdout, "Usage: ./mybgp [-hsc]\n");
         fprintf(stdout, "s: Server Side.\nc: Client Side.\nh: HELP.\n");
         return 0;
       default:
@@ -95,8 +95,8 @@ void server_side(){
   /* パケットの受信 */
   fprintf(stdout, "--------------------\n"); 
   while(1){
-    size = read(soc, buf, BUFSIZE);  
-    bgp_recv(buf, size);
+    size = read(soc, buf, sizeof(buf));  
+    analyze_bgp(buf, size);
   }   
   
   close(soc); 
@@ -109,7 +109,8 @@ void client_side(){
   unsigned short sPort = 179;   // ポート番号
   int soc;                      // 送受信用ソケット
   struct sockaddr_in sa;        // サーバ情報
-  char buf[BUFSIZE];            // 受信用バッファ
+  unsigned char buf[BUFSIZE];   // 受信用バッファ
+  int size = 29;
   /* 標準入力用 */
   char dst_ip[50];              // configに書いて読み込む方式に...
 
@@ -138,14 +139,15 @@ void client_side(){
   fprintf(stdout, "Connect to %s\n", dst_ip);
 
   /* BGP情報を格納 */
-  bgp_send(buf);  
+  send_bgp(soc, size);      // sizeはとりま29で固定  
 
-  /* パケットの送信 */
+  /*
+  // パケットの送信 
   fprintf(stdout, "--------------------\n");
   while(1){ 
-    write(soc, buf, strlen(buf)+1, 0);
+    write(soc, buf, sizeof(buf));
   }
-
+  */
   close(soc);
 }
 
