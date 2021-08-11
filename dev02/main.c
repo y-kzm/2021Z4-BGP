@@ -55,5 +55,99 @@ int main(int argc, char *argv[])
 }
 
 
+/* サーバ側の処理 */
+void server_side(){   
+  unsigned short sPort = 179;   // ポート番号
+  int soc_wait;                 // listen用ソケット 
+  int soc;                      // 送受信用ソケット
+  struct sockaddr_in sa;        // サーバ(me)情報
+  unsigned char buf[BUFSIZE];   // 受信用バッファ
+  int size;
+
+  /* ソケット生成 */
+  if((soc_wait = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+    perror("socket() failed.");
+    exit(1);
+  }
+
+  /* サーバ情報を格納 */
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family       = AF_INET;
+  sa.sin_addr.s_addr  = htonl(INADDR_ANY);  // 任意のアドレスを示す(0.0.0.0)
+  sa.sin_port         = htons(sPort);
+
+  /* サーバ情報をソケットに設定 */
+  if(bind(soc_wait, (struct sockaddr *) &sa, sizeof(sa)) < 0){
+    perror("bind() failed.");
+    exit(1);
+  }
+
+  /* 待ち受け */
+  if(listen(soc_wait, QUELIM) < 0){
+    perror("listen() failed.");
+    exit(1);
+  }
+    
+  fprintf(stdout, "Waiting for connection ...\n");
+  soc = accept(soc_wait, NULL, NULL);
+  fprintf(stdout, "Connected from %s\n", inet_ntoa(sa.sin_addr));
+
+  /* パケットの受信 */
+  fprintf(stdout, "--------------------\n"); 
+  while(1){
+    size = read(soc, buf, BUFSIZE);  
+    bgp_recv(buf, size);
+  }   
+  
+  close(soc); 
+    
+}
+
+
+/* クライアント側の処理 */
+void client_side(){
+  unsigned short sPort = 179;   // ポート番号
+  int soc;                      // 送受信用ソケット
+  struct sockaddr_in sa;        // サーバ情報
+  char buf[BUFSIZE];            // 受信用バッファ
+  /* 標準入力用 */
+  char dst_ip[50];              // configに書いて読み込む方式に...
+
+  /* 宛先IPアドレスと宛先ポートを指定 */
+  fprintf(stdout, "IP address connect to ? : ");
+  scanf("%s", dst_ip);
+
+   /* ソケット生成 */
+  if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+    perror("socket() failed.");
+    exit(1);
+  }
+
+  /* サーバ情報を格納 */
+  memset(&sa, 0, sizeof(sa));
+  sa.sin_family       = AF_INET;
+  sa.sin_addr.s_addr  = inet_addr(dst_ip);
+  sa.sin_port         = htons(sPort);
+
+  /* サーバに接続 */
+  fprintf(stdout, "Tring to connect %s ...\n", dst_ip);
+  if(connect(soc, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
+    perror("connect() failed.");
+    exit(1);
+  } 
+  fprintf(stdout, "Connect to %s\n", dst_ip);
+
+  /* BGP情報を格納 */
+  bgp_send(buf);  
+
+  /* パケットの送信 */
+  fprintf(stdout, "--------------------\n");
+  while(1){ 
+    write(soc, buf, strlen(buf)+1, 0);
+  }
+
+  close(soc);
+}
+
 
 
