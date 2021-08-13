@@ -12,6 +12,9 @@
 #define BUFSIZE 512
 #define QUELIM 5
   
-
+void server_side();
+void client_side();
+void analyze_bgp(unsigned char *data, int size);
+void set_bgp(unsigned char *buf, int size);
 
 #endif

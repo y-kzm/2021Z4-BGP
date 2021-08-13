@@ -14,61 +14,50 @@
 
 // dataを先頭から解析
 void analyze_bgp(unsigned char *data, int size){
-  struct bgp_hdr *bh;
   struct bgp_open *bo;
-  unsigned char *ptr
-  int lest;
+  unsigned char *ptr;
+  int i;
   
   ptr = data;
-  lest = size;
 
-  bh = (struct bgp_hdr *)ptr;
-  ptr += sizeof(struct bgp_hdr);
+  bo = (struct bgp_open *)ptr;
+  ptr += BGP_OPEN_LEN;
   fprintf(stdout, "-----BGP HEADER-----\n");
   fprintf(stdout, "Marker: ");
   for(i=0; i<16; i++){
-    fprintf(stdout, " %u", bh->marker[i]);
+    fprintf(stdout, " %x", bo->marker[i]);
   } fprintf(stdout, " \n");
-  fprintf(stdout, "Len: %u\n", bh->len);
-  fprintf(stdout, "Type: %u\n", bh->type);  
+  fprintf(stdout, "Len: %u\n", bo->len);
+  fprintf(stdout, "Type: %u\n", bo->type);  
 
-  bp = (struct bgp_open *)ptr;
-  ptr += sizeof(struct bgp_open);
   fprintf(stdout, "-----OPEN MSG-----\n");
-  fprintf(stdout, "Version: %u\n", b0->version);
+  fprintf(stdout, "Version: %u\n", bo->version);
   fprintf(stdout, "MyAS: %u\n", bo->myas);
   fprintf(stdout, "HoldTime: %u\n", bo->holdtime);
-  fprintf(stdout, "Id: %u\n", bo->id);
+  fprintf(stdout, "Id: %s\n", inet_ntoa(bo->id));
   fprintf(stdout, "Opt_Len: %u\n", bo->opt_len);
+
 }
 
 // 構造体に情報を入れて送信
-void send_bgp(int soc, int size){
-  struct bgp_hdr *bh;
-  struct bgp_open *bo;
+void set_bgp(unsigned char *buf, int size){
+  struct bgp_open bo;
   int i;
-  unsigned char *ptr, buf[BUFSIZE];
 
-  // とりあえず全て固定値
   for(i=0; i<16; i++){
-    bh->marker[i] = 1;
+    bo.marker[i] = 255;
   }
-  bh->len = 29;
-  bh->type = 1;     // open
+  bo.len = BGP_OPEN_LEN;
+  bo.type = 1;     // open
   
-  bo->version = 4;
-  bo->myas = 1;
-  bo->holdtime = 180;
-  bo->id = inet_addr(10.255.1.1);
-  bo->opt_len = 0;
+  bo.version = 4;
+  bo.myas = 2;
+  bo.holdtime = 180;
+  bo.id.s_addr = inet_addr("10.255.0.2");
+  bo.opt_len = 0;
 
-  ptr = buf;
-  memcpy(ptr, &bh, sizeof(struct bgp_hdr));
-  ptr += sizeof(struct bgp_hdr);
-  memcpy(ptr, &bo, sizeof(struct bgp_open));
-  ptr += sizeof(struct bgp_open);
+  //ptr = buf;
+  memcpy(buf, &bo, BGP_OPEN_LEN);
+  //ptr += sizeof(struct bgp_hdr);
 
-  while(1){
-    write(soc, buf, size);
-  }
 }

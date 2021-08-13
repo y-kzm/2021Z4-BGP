@@ -1,19 +1,16 @@
 CC = gcc
-PROGRAM = socket
+PROGRAM = mybgp
 CFLAGS = -Wall -O2
 
-OBJS = main.o server.o client.o
+OBJS = main.o bgp.o 
 $(PROGRAM) : $(OBJS)
 	$(CC) $(OBJS) -o $(PROGRAM)
 	
 main.o : main.c includes.h 
 	$(CC) -c $(CFLAGS) main.c
 		
-server.o : server.c includes.h
-	$(CC) -c $(CFLAGS) server.c
+bgp.o : bgp.c includes.h bgp.h
+	$(CC) -c $(CFLAGS) bgp.c
 		
-client.o : client.c includes.h
-	$(CC) -c $(CFLAGS) client.c
-			
 clean:
 	rm $(PROGRAM) $(OBJS)

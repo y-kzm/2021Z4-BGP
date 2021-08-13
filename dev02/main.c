@@ -8,7 +8,10 @@
 
 #include <stdio.h>
 #include <unistd.h>   // getopt(), システムコール
+#include <stdlib.h>
+#include <string.h>
 #include "includes.h"
+#include "bgp.h"
 
 // 後々、設定ファイルを用意して引数に渡す感じで...
 int main(int argc, char *argv[])
@@ -62,7 +65,6 @@ void server_side(){
   int soc;                      // 送受信用ソケット
   struct sockaddr_in sa;        // サーバ(me)情報
   unsigned char buf[BUFSIZE];   // 受信用バッファ
-  int size;
 
   /* ソケット生成 */
   if((soc_wait = socket(AF_INET, SOCK_STREAM, 0)) < 0){
@@ -90,14 +92,12 @@ void server_side(){
     
   fprintf(stdout, "Waiting for connection ...\n");
   soc = accept(soc_wait, NULL, NULL);
-  fprintf(stdout, "Connected from %s\n", inet_ntoa(sa.sin_addr));
 
   /* パケットの受信 */
-  fprintf(stdout, "--------------------\n"); 
-  while(1){
-    size = read(soc, buf, sizeof(buf));  
-    analyze_bgp(buf, size);
-  }   
+  fprintf(stdout, "--------------------\n");    
+  
+  read(soc, buf, BGP_OPEN_LEN);  
+  analyze_bgp(buf, BGP_OPEN_LEN);
   
   close(soc); 
     
@@ -109,14 +109,7 @@ void client_side(){
   unsigned short sPort = 179;   // ポート番号
   int soc;                      // 送受信用ソケット
   struct sockaddr_in sa;        // サーバ情報
-  unsigned char buf[BUFSIZE];   // 受信用バッファ
-  int size = 29;
-  /* 標準入力用 */
-  char dst_ip[50];              // configに書いて読み込む方式に...
-
-  /* 宛先IPアドレスと宛先ポートを指定 */
-  fprintf(stdout, "IP address connect to ? : ");
-  scanf("%s", dst_ip);
+  unsigned char buf[BUFSIZE];   // 送信用バッファ
 
    /* ソケット生成 */
   if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
@@ -127,27 +120,25 @@ void client_side(){
   /* サーバ情報を格納 */
   memset(&sa, 0, sizeof(sa));
   sa.sin_family       = AF_INET;
-  sa.sin_addr.s_addr  = inet_addr(dst_ip);
+  sa.sin_addr.s_addr  = inet_addr("10.255.1.1");
   sa.sin_port         = htons(sPort);
 
   /* サーバに接続 */
-  fprintf(stdout, "Tring to connect %s ...\n", dst_ip);
+  //fprintf(stdout, "Tring to connect %s ...\n", );
   if(connect(soc, (struct sockaddr*) &sa, sizeof(sa)) < 0) {
     perror("connect() failed.");
     exit(1);
   } 
-  fprintf(stdout, "Connect to %s\n", dst_ip);
 
   /* BGP情報を格納 */
-  send_bgp(soc, size);      // sizeはとりま29で固定  
+  set_bgp(buf, BGP_OPEN_LEN);       
 
-  /*
   // パケットの送信 
   fprintf(stdout, "--------------------\n");
-  while(1){ 
-    write(soc, buf, sizeof(buf));
-  }
-  */
+  fprintf(stdout, "Sending...\n"); 
+  
+  write(soc, buf, BGP_OPEN_LEN);
+  
   close(soc);
 }
 
