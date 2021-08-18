@@ -4,6 +4,12 @@ Yokoo Kazuma
 
 ---
 - dev01/
-  - ソケットを用いたTCP通信でメッセージをやり取りするプログラム
+  - ソケットを用いたTCP通信でメッセージをやり取りするプログラム  
+- dev02/ 
+  - 一方的にOPEN Messageを送信する  
+  - wiresharkでOPEN Msgを確認  
+- dev03/ 
+  - dev02/をもとに拡張
+  - 状態遷移を意識して、OPEN Msgを相互でやりとりできる様に  
 
 
