@@ -2,7 +2,7 @@
 ### [wiresharkでBGP OPEN Messageを確認]
 
 一方的にOPEN Messageを送信する  
-dev03ではconfigファイルの様なものを用意し、MyASやidを変更しやすい様に  
+dev03では状態遷移を意識し、OPENメッセージを相互でやりとりできる様にする 
 
 - Usage: 
 ~~~
