@@ -1,4 +1,14 @@
 #ifndef BGP_H
+#include <sys/types.h>   
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+/*
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+*/
+
 
 // BGP Header Format
 struct bgp_hdr {
@@ -6,6 +16,7 @@ struct bgp_hdr {
   uint16_t len;
   uint8_t type;
 };
+#define MARKER_LEN 16
 #define BGP_HDR_LEN 19
 
 // BGP Open Msg Format
@@ -24,8 +35,14 @@ struct bgp_open {
 // BGP State
 #define IDLE_STATE 1
 #define CONNECT_STATE 2
-#define OPNESENT_STATE 3
+#define OPENSENT_STATE 3
 // Add morte state ...
+
+void sending_open(struct param p);
+void waiting_open();
+
+#endif
+
 
 // state_transition()
 /*
@@ -45,9 +62,4 @@ struct bgp_open {
 ※ 呼ばれる関数は基本的にservモードとrecvモードで場合わけ
 */
 
-void state_transition();            // Process by state.
-int tcp_connect(int mode);          // Establish tcp connection.
 
-
-
-#endif

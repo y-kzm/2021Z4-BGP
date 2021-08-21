@@ -9,9 +9,17 @@
 #include <string.h>     // memset() ...
 #include <stdlib.h>     // exit() ...
 #include "param.h"
+#include "bgp.h"
 #include "includes.h"
 
-static struct param     p;
+// param R1> , R2>
+const struct param     param1 = {"1", "10.255.1.1", "2", "10.255.1.2"};
+const struct param     param2 = {"2", "10.255.1.2", "1", "10.255.1.1"};
+
+// state, mode, socket
+unsigned int state = IDLE_STATE;
+unsigned int mode;
+int soc;
 
 /*---------- main ----------*/
 int main(int argc, char *argv[])
@@ -51,9 +59,12 @@ int main(int argc, char *argv[])
 /*---------- server ----------*/
 void server()
 {
-
-
-    state_transition(IDLE_STATE, SERVER_MODE);
+    int i = 0;
+    mode = SERVER_MODE;
+    while(i!=3){
+        state_transition();
+        i++;
+    }
 }
 
 
@@ -61,22 +72,31 @@ void server()
 /*---------- client ----------*/
 void client()
 {
-
-
-    state_transition(IDLE_STATE, CLIENT_MODE);
+    int i = 0;
+    mode = CLIENT_MODE;
+    while(i!=3){
+        state_transition();
+        i++;
+    }
 }
 
 
 
 /*---------- state_transition ----------*/
-void state_transition(int state, int mode)
+void state_transition()
 {
-    switc(state){
-        case IDLE_MODE:
+    switch(state){
+        case IDLE_STATE:
+            tcp_connect();
             break;
         case CONNECT_STATE:
+            if(mode == SERVER_MODE)
+                sending_open(param1);
+            else if(mode == CLIENT_MODE)
+                sending_open(param2); 
             break;
-        case OPNESENT_STATE:
+        case OPENSENT_STATE:
+            waiting_open();
             break;
         default:
             fprintf(stderr, "State Error.\n");
@@ -87,19 +107,20 @@ void state_transition(int state, int mode)
 
 
 /*---------- tcp_connect ----------*/
-int tcp_connect(int mode)   // 引数にIPアドレス？
+void tcp_connect() 
 {
     unsigned short sPort = 179;     // Port Num
-    int srcSoc;                     // Src Socketfd
-    int dstSoc;                     // Dst Socketfd
+    // int srcSoc;                     // Src Socketfd
+    // int dstSoc;                     // Dst Socketfd
     struct sockaddr_in sa;          // Src param
     struct sockaddr_in da;          // Dst param
 
+    // Server side.
     if(mode == SERVER_MODE){
         /* Create a socket */
-        if((srcSoc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
             perror("socket() failed.");
-            return -1;
+            exit(EXIT_FAILURE);
         }
 
         /* Storage of src param */
@@ -109,44 +130,50 @@ int tcp_connect(int mode)   // 引数にIPアドレス？
         sa.sin_port         = htons(sPort);
 
         /* Bind src param to the socket. */
-        if(bind(srcSoc, (struct sockaddr *) &sa, sizeof(sa)) < 0){
+        if(bind(soc, (struct sockaddr *) &sa, sizeof(sa)) < 0){
             perror("bind() failed.");
-            return -1;
+            exit(EXIT_FAILURE);
         }
 
         /* Waiting for connection. */
-        if(listen(srcSoc, BACK_LOG) < 0){
+        if(listen(soc, BACK_LOG) < 0){
             perror("listen() failed.");
-            return -1;
+            exit(EXIT_FAILURE);
         }
         fprintf(stdout, "Waiting for connection ...\n");
 
         /* Accepting the connection. */
-        if((dstSoc = accept(srcSoc, (struct sockaddr *) &da, sizeof(da))) < 0){
+        // if((soc = accept(soc, (struct sockaddr *) &da, sizeof(da))) < 0){
+        if((soc = accept(soc, NULL, NULL)) < 0){
             perror("accept() failed.");
-            return -1;
+            exit(EXIT_FAILURE);
         }
         fprintf(stdout, "Connected from %s\n", inet_ntoa(da.sin_addr));
 
+        /* State transition. */
+        state = OPENSENT_STATE;
+
+    // Client side.
     } else if(mode == CLIENT_MODE){
         /* Create a socket */
-        if((dstSoc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
             perror("socket() failed.");
-            return -1;
+            exit(EXIT_FAILURE);
         } 
 
         /* Storage of dst param. */
         memset(&da, 0, sizeof(sa));
         da.sin_family       = AF_INET;
-        da.sin_addr.s_addr  = inet_addr(DST);              // アドレス格納
+        da.sin_addr.s_addr  = inet_addr(param2.Neighbor);  
         da.sin_port         = htons(sPort);
 
         /* Connect. */
-        fprintf(stdout, "Trying to connect to %s: \n", DST);      // アドレス格納
-        connect(dstSoc, (struct sockaddr *) &da, sizeof(da));
+        fprintf(stdout, "Trying to connect to %s \n", param2.Neighbor); 
+        connect(soc, (struct sockaddr *) &da, sizeof(da));
+
+        /* State transition. */
+        state = CONNECT_STATE;
 
     } else 
-        return -1;
-
-    return 0;
+        exit(EXIT_FAILURE);
 }

@@ -7,6 +7,4 @@ struct param {
     char *Neighbor;
 };
 
-
-
 #endif
