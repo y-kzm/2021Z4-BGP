@@ -27,13 +27,13 @@ void analyze_bgp(unsigned char *data, int size){
   for(i=0; i<16; i++){
     fprintf(stdout, " %x", bo->marker[i]);
   } fprintf(stdout, " \n");
-  fprintf(stdout, "Len: %u\n", bo->len);
+  fprintf(stdout, "Len: %u\n", ntohs(bo->len));
   fprintf(stdout, "Type: %u\n", bo->type);  
 
   fprintf(stdout, "-----OPEN MSG-----\n");
   fprintf(stdout, "Version: %u\n", bo->version);
-  fprintf(stdout, "MyAS: %u\n", bo->myas);
-  fprintf(stdout, "HoldTime: %u\n", bo->holdtime);
+  fprintf(stdout, "MyAS: %u\n", ntohs(bo->myas));
+  fprintf(stdout, "HoldTime: %u\n", ntohs(bo->holdtime));
   fprintf(stdout, "Id: %s\n", inet_ntoa(bo->id));
   fprintf(stdout, "Opt_Len: %u\n", bo->opt_len);
 
@@ -47,13 +47,13 @@ void set_bgp(unsigned char *buf, int size){
   for(i=0; i<16; i++){
     bo.marker[i] = 255;
   }
-  bo.len = BGP_OPEN_LEN;
+  bo.len = htons(BGP_OPEN_LEN);
   bo.type = 1;     // open
   
   bo.version = 4;
-  bo.myas = 2;
-  bo.holdtime = 180;
-  bo.id.s_addr = inet_addr("10.255.0.2");
+  bo.myas = htons(2);
+  bo.holdtime = htons(180);
+  bo.id.s_addr = inet_addr("10.255.1.2");
   bo.opt_len = 0;
 
   //ptr = buf;
