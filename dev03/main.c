@@ -1,62 +1,82 @@
 /*
-    > main.c
-    > 2021/08/18
-    > Yokoo Kazuma
+ * main.c
+ * 2021/08/18 ~
+ * Yokoo Kazuma
+ * Client Side.
 */
 
 #include <stdio.h>
-#include <unistd.h>     // getopt() ...
-#include <string.h>     // memset() ...
 #include <stdlib.h>     // exit() ...
+#include <unistd.h>
+#include <string.h>
 #include "param.h"
 #include "bgp.h"
 #include "includes.h"
 
-// param R1> , R2>
-const struct param     param1 = {"1", "10.255.1.1", "2", "10.255.1.2"};
-const struct param     param2 = {"2", "10.255.1.2", "1", "10.255.1.1"};
-
-// state, mode, socket
-unsigned int state = IDLE_STATE;
-unsigned int mode;
+// State
+enum STATE state;
+// Socket.
 int soc;
 
+// Global configuration variables.
+struct config   cfg;
+
+
 /*---------- main ----------*/
+// ./mybgp conf.json
 int main(int argc, char *argv[])
 {
-    int opt;    // getopt()
+    // Variables for reading json file.
+    int fd, size;
+    char buf[4096];
 
-    if(argc != 2){
-        fprintf(stderr, "Too many arguments.\n");
+    if(argc != 2) {
+        fprintf(stderr, "The arguments are different.\n");
+        usage();
         return -1;
     }
 
-    /* Options */
-    opterr = 0;
-    while((opt = getopt(argc, argv, "sch")) != -1){
-        switch(opt){
-            case 's':         // server side.
-                server();
-                break; 
-            case 'c':         // client side.
-                client();
-                break;
-            case 'h':         // help.       
-                fprintf(stdout, "Usage: ./mybgp [-hsc]\n");
-                fprintf(stdout, "s: Server Side.\nc: Client Side.\nh: HELP.\n");
-                return 0;
-            default:
-                fprintf(stderr, "Option Error.\n");
-                return -1;
-        } 
+    // Open json file.
+    fd = open(argv[1], O_RDONLY);
+    if(fd < 0) {
+        printf("Error open().\n");
+        return -1;
+    }
+
+    // Read json file.
+    size = read(fd, buf, sizeof(buf));
+    if(size < 0) {
+        printf("Error read().\n");
+        return -1;
+    }
+    close(fd);
+
+    // Read config.
+    cfg = parse_json((const char *)buf, size);
+    // Debug.
+    printf("Loaded the following settings.\n");
+    printf("# myas  : %d\n", cfg.my_as);
+    printf("# id    : %s\n", inet_ntoa(cfg.router_id));
+    printf("# neighbor_address: %s\n", inet_ntoa(cfg.ne.addr));
+    printf("# remote_as       : %d\n", cfg.ne.remote_as);
+
+    // Init state.
+    state = IDLE_STATE;
+    while(1) {
+       state_transition(); 
     }
 
     return 0;
 }
 
-
+void usage()
+{
+    fprintf(stdout, "./mybgp [JSON FILE]\n");
+    fprintf(stdout, "The json file describes the configuration.\n");
+}
 
 /*---------- server ----------*/
+/*
 void server()
 {
     int i = 0;
@@ -66,10 +86,10 @@ void server()
         i++;
     }
 }
-
-
+*/
 
 /*---------- client ----------*/
+/*
 void client()
 {
     int i = 0;
@@ -79,7 +99,7 @@ void client()
         i++;
     }
 }
-
+*/
 
 
 /*---------- state_transition ----------*/
@@ -90,14 +110,14 @@ void state_transition()
             tcp_connect();
             break;
         case CONNECT_STATE:
-            if(mode == SERVER_MODE)
-                sending_open(param1);
-            else if(mode == CLIENT_MODE)
-                sending_open(param2); 
+            process_connect(); 
             break;
         case OPENSENT_STATE:
-            waiting_open();
+            process_opensent();
             break;
+        case OPENCONFIRM_STATE:
+            printf("Implemented so far.\n");
+            exit(EXIT_FAILURE);
         default:
             fprintf(stderr, "State Error.\n");
             exit(EXIT_FAILURE);
@@ -112,68 +132,26 @@ void tcp_connect()
     unsigned short sPort = 179;     // Port Num
     // int srcSoc;                     // Src Socketfd
     // int dstSoc;                     // Dst Socketfd
-    struct sockaddr_in sa;          // Src param
+    // struct sockaddr_in sa;          // Src param
     struct sockaddr_in da;          // Dst param
 
-    // Server side.
-    if(mode == SERVER_MODE){
-        /* Create a socket */
-        if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-            perror("socket() failed.");
-            exit(EXIT_FAILURE);
-        }
-
-        /* Storage of src param */
-        memset(&sa, 0, sizeof(sa));
-        sa.sin_family       = AF_INET;
-        sa.sin_addr.s_addr  = htonl(INADDR_ANY);  // Any address(0.0.0.0)
-        sa.sin_port         = htons(sPort);
-
-        /* Bind src param to the socket. */
-        if(bind(soc, (struct sockaddr *) &sa, sizeof(sa)) < 0){
-            perror("bind() failed.");
-            exit(EXIT_FAILURE);
-        }
-
-        /* Waiting for connection. */
-        if(listen(soc, BACK_LOG) < 0){
-            perror("listen() failed.");
-            exit(EXIT_FAILURE);
-        }
-        fprintf(stdout, "Waiting for connection ...\n");
-
-        /* Accepting the connection. */
-        // if((soc = accept(soc, (struct sockaddr *) &da, sizeof(da))) < 0){
-        if((soc = accept(soc, NULL, NULL)) < 0){
-            perror("accept() failed.");
-            exit(EXIT_FAILURE);
-        }
-        fprintf(stdout, "Connected from %s\n", inet_ntoa(da.sin_addr));
-
-        /* State transition. */
-        state = OPENSENT_STATE;
-
     // Client side.
-    } else if(mode == CLIENT_MODE){
-        /* Create a socket */
-        if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-            perror("socket() failed.");
-            exit(EXIT_FAILURE);
-        } 
-
-        /* Storage of dst param. */
-        memset(&da, 0, sizeof(sa));
-        da.sin_family       = AF_INET;
-        da.sin_addr.s_addr  = inet_addr(param2.Neighbor);  
-        da.sin_port         = htons(sPort);
-
-        /* Connect. */
-        fprintf(stdout, "Trying to connect to %s \n", param2.Neighbor); 
-        connect(soc, (struct sockaddr *) &da, sizeof(da));
-
-        /* State transition. */
-        state = CONNECT_STATE;
-
-    } else 
+    /* Create a socket */
+    if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+        perror("socket() failed.");
         exit(EXIT_FAILURE);
+    } 
+
+    /* Storage of dst param. */
+    memset(&da, 0, sizeof(da));
+    da.sin_family       = AF_INET;
+    da.sin_addr.s_addr  = cfg.ne.addr.s_addr;  
+    da.sin_port         = htons(sPort);
+
+    /* Connect. */
+    fprintf(stdout, "Trying to connect to %s \n", inet_ntoa(cfg.ne.addr)); 
+    connect(soc, (struct sockaddr *) &da, sizeof(da));
+
+    /* State transition. */
+    state = CONNECT_STATE;
 }

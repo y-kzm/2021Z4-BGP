@@ -1,7 +1,7 @@
 /*
-    > bgp.c
-    > 2021/08/21
-    > Yokoo Kazuma
+ * bgp.c
+ * 2021/08/21 ~
+ * Yokoo Kazuma
 */
 
 #include <stdio.h>
@@ -12,28 +12,30 @@
 #include "bgp.h"
 #include "includes.h"
 
-void sending_open(struct param   p) // modeで場合わけ
+void process_connect()
 {
     struct bgp_open bo;
     int i;
     unsigned char buf[BUFSIZE];
 
+    // Set header.
     for(i=0; i<MARKER_LEN; i++){
-        bo.marker[i] = 255;
+        bo.hdr.marker[i] = 255;
     }
-    bo.len = htons(BGP_OPEN_LEN);
-    bo.type = 1;            // Open
+    bo.hdr.len = htons(BGP_OPEN_LEN);
+    bo.hdr.type = OPEN_MSG;
     
+    // Set open message.
     bo.version = 4;
-    bo.myas = htons(atoi(p.MyAS));
+    bo.myas = htons(cfg.my_as);
     bo.holdtime = htons(180);
-    bo.id.s_addr = inet_addr(p.RouterId);
+    bo.id.s_addr = cfg.router_id.s_addr;
     bo.opt_len = 0;
 
     //ptr = buf;
     memcpy(buf, &bo, BGP_OPEN_LEN);
 
-    /* パケットの送信 */
+    /* Send packets */
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending Open Msg...\n\n"); 
   
@@ -43,14 +45,14 @@ void sending_open(struct param   p) // modeで場合わけ
     state = OPENSENT_STATE;
 }
 
-void waiting_open()
+void process_opensent()
 {
     struct bgp_open     *bo;
     unsigned char *ptr;
-    int i;
     unsigned char buf[BUFSIZE];
-    
-    /* パケットの受信 */
+    int i;
+
+    /* Recv packets. */
     fprintf(stdout, "--------------------\n");    
     read(soc, buf, BGP_OPEN_LEN);  
     
@@ -58,20 +60,20 @@ void waiting_open()
 
     bo = (struct bgp_open *)ptr;
     ptr += BGP_OPEN_LEN;
-    fprintf(stdout, "-----BGP HEADER: Recv-----\n");
+    fprintf(stdout, "-----BGP HEADER RECV-----\n");
     fprintf(stdout, "Marker: ");
     for(i=0; i<MARKER_LEN; i++){
-        fprintf(stdout, " %x", bo->marker[i]);
+        fprintf(stdout, " %x", bo->hdr.marker[i]);
     } fprintf(stdout, " \n");
-    fprintf(stdout, "Len: %u\n", ntohs(bo->len));
-    fprintf(stdout, "Type: %u\n", bo->type);  
+    fprintf(stdout, "Len: %u\n", ntohs(bo->hdr.len));
+    fprintf(stdout, "Type: %u\n", bo->hdr.type);  
 
-    fprintf(stdout, "-----OPEN MSG: Recv-----\n");
+    fprintf(stdout, "-----OPEN MSG RECV-----\n");
     fprintf(stdout, "Version: %u\n", bo->version);
     fprintf(stdout, "MyAS: %u\n", ntohs(bo->myas));
     fprintf(stdout, "HoldTime: %u\n", ntohs(bo->holdtime));
     fprintf(stdout, "Id: %s\n", inet_ntoa(bo->id));
-    fprintf(stdout, "Opt_Len: %u\n", bo->opt_len);
+    fprintf(stdout, "Opt_Len: %u\n\n", bo->opt_len);
 
-    state = CONNECT_STATE;
+    state = OPENCONFIRM_STATE;
 }

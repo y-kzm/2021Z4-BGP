@@ -1,29 +1,36 @@
 #ifndef BGP_H
-#include <sys/types.h>   
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-/*
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
-*/
+
+/* BGP State */
+enum STATE {
+    IDLE_STATE,         // 0
+    CONNECT_STATE,      // 1
+    OPENSENT_STATE,     // 2
+    ACTIVE_STATE,       // 3
+    OPENCONFIRM_STATE,  // 4
+    ESTABLISHED_STATE   // 5
+};
+extern enum STATE state;
 
 
-// BGP Header Format
+/* BGP Message Types. */
+#define OPEN_MSG          1
+#define UPDATE_MSG        2
+#define NOTIFICATION_MSG  3
+#define KEEPALIVW_MSG     4
+
+
+/* BGP Header Format. */
 struct bgp_hdr {
   uint8_t marker[16];  
   uint16_t len;
   uint8_t type;
 };
-#define MARKER_LEN 16
+#define MARKER_LEN  16
 #define BGP_HDR_LEN 19
 
-// BGP Open Msg Format
+/* BGP Open Msg Format. */
 struct bgp_open {
-  uint8_t marker[16];  
-  uint16_t len;
-  uint8_t type;
+  struct bgp_hdr  hdr;
   uint8_t version;
   uint16_t myas;
   uint16_t holdtime;
@@ -32,18 +39,14 @@ struct bgp_open {
 };
 #define BGP_OPEN_LEN 29
 
-// BGP State
-#define IDLE_STATE 1
-#define CONNECT_STATE 2
-#define OPENSENT_STATE 3
-// Add morte state ...
 
-void sending_open(struct param p);
-void waiting_open();
+/* Functon. */
+void process_connect();
+void process_opensent();
 
 #endif
 
-
+/* Memo. */
 // state_transition()
 /*
 - IDLE_STATE 
