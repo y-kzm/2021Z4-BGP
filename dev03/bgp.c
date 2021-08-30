@@ -12,7 +12,8 @@
 #include "bgp.h"
 #include "includes.h"
 
-void process_connect()
+/*---------- prosecc_connect_sendopen ----------*/
+void process_connect_sendopen()
 {
     struct bgp_open bo;
     int i;
@@ -45,7 +46,8 @@ void process_connect()
     state = OPENSENT_STATE;
 }
 
-void process_opensent()
+/*---------- prosecc_opensent_recvopen ----------*/
+void process_opensent_recvopen()
 {
     struct bgp_open     *bo;
     unsigned char *ptr;
@@ -74,6 +76,59 @@ void process_opensent()
     fprintf(stdout, "HoldTime: %u\n", ntohs(bo->holdtime));
     fprintf(stdout, "Id: %s\n", inet_ntoa(bo->id));
     fprintf(stdout, "Opt_Len: %u\n\n", bo->opt_len);
+}
+
+/*---------- prosecc_opensent_sendkeep ----------*/
+void process_opensent_sendkeep()
+{
+    struct bgp_hdr bh;
+    int i;
+    unsigned char buf[BUFSIZE];
+
+    // Set header.
+    for(i=0; i<MARKER_LEN; i++){
+        bh.marker[i] = 255;
+    }
+    bh.len = htons(BGP_HDR_LEN);
+    bh.type = KEEPALIVE_MSG;
+    
+    //ptr = buf;
+    memcpy(buf, &bh, BGP_HDR_LEN);
+
+    /* Send packets */
+    fprintf(stdout, "--------------------\n");
+    fprintf(stdout, "Sending KeepAlive Msg...\n\n"); 
+  
+    write(soc, buf, BGP_HDR_LEN);
 
     state = OPENCONFIRM_STATE;
+}
+
+/*---------- prosecc_openfirm_recvkeep ----------*/
+void prosecc_openconfirm_recvkeep()
+{
+    struct bgp_hdr     *bh;
+    unsigned char *ptr;
+    unsigned char buf[BUFSIZE];
+    int i;
+
+    /* Recv packets. */
+    fprintf(stdout, "--------------------\n");    
+    read(soc, buf, BGP_HDR_LEN);  
+    
+    ptr = buf;
+
+    bh = (struct bgp_hdr *)ptr;
+    ptr += BGP_HDR_LEN;
+    fprintf(stdout, "-----BGP KEEPALIVE RECV-----\n");
+    fprintf(stdout, "Marker: ");
+    for(i=0; i<MARKER_LEN; i++){
+        fprintf(stdout, " %x", bh->marker[i]);
+    } fprintf(stdout, " \n");
+    fprintf(stdout, "Len: %u\n", ntohs(bh->len));
+    fprintf(stdout, "Type: %u\n", bh->type);  
+
+    state = ESTABLISHED_STATE; 
+
+    // holdtime();
 }

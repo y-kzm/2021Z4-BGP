@@ -32,14 +32,14 @@ parse_json(const char *buf, size_t buflen)
     if(json_is_integer(obj)) {
         value = json_integer_value(obj);
         cfg.my_as = value; 
-        printf("router bgp: %d\n", value);
+        // printf("router bgp: %d\n", value);
     }
 
     obj = json_object_get(root, "router-id");
     if(json_is_string(obj)) {
         str = json_string_value(obj);
         inet_aton(str, &cfg.router_id);
-        printf("router-id: %s\n", str);
+        // printf("router-id: %s\n", str);
     }
 
 
@@ -52,14 +52,14 @@ parse_json(const char *buf, size_t buflen)
         if(json_is_string(obj_ne)) {
             str = json_string_value(obj_ne);
             inet_aton(str, &cfg.ne.addr);
-            printf("neighbor address: %s\n", str); 
+            // printf("neighbor address: %s\n", str); 
         }
 
         obj_ne = json_object_get(obj, "remote-as");
         if(json_is_integer(obj_ne)) {
             value = json_integer_value(obj_ne);
             cfg.ne.remote_as = value;
-            printf("remote-as: %d\n", value); 
+            // printf("remote-as: %d\n", value); 
         }
     }
 

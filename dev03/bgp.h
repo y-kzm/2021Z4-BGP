@@ -16,7 +16,7 @@ extern enum STATE state;
 #define OPEN_MSG          1
 #define UPDATE_MSG        2
 #define NOTIFICATION_MSG  3
-#define KEEPALIVW_MSG     4
+#define KEEPALIVE_MSG     4
 
 
 /* BGP Header Format. */
@@ -41,28 +41,12 @@ struct bgp_open {
 
 
 /* Functon. */
-void process_connect();
-void process_opensent();
+void process_connect_sendopen();
+void process_opensent_recvopen();
+void process_opensent_sendkeep();
+void prosecc_openconfirm_recvkeep();
 
 #endif
 
-/* Memo. */
-// state_transition()
-/*
-- IDLE_STATE 
-    > tcp_connect() socket準備とか 
-    > clientはidleからopensentへ
-    > serverはidleからconnectへ
-- CONNECT_STATE 
-    > sending_open() 
-    > serverはopenmsgを送信してopesent状態へ
-    > client    
-- OPENSENT_STATE 
-    > waiting_open()
-    > openmsg待ち状態
-    > clientはopenmsgを受け取った後、connect状態へ
-    > server 
-※ 呼ばれる関数は基本的にservモードとrecvモードで場合わけ
-*/
 
 

@@ -17,8 +17,7 @@
 enum STATE state;
 // Socket.
 int soc;
-
-// Global configuration variables.
+// Config.
 struct config   cfg;
 
 
@@ -55,10 +54,11 @@ int main(int argc, char *argv[])
     cfg = parse_json((const char *)buf, size);
     // Debug.
     printf("Loaded the following settings.\n");
-    printf("# myas  : %d\n", cfg.my_as);
-    printf("# id    : %s\n", inet_ntoa(cfg.router_id));
-    printf("# neighbor_address: %s\n", inet_ntoa(cfg.ne.addr));
-    printf("# remote_as       : %d\n", cfg.ne.remote_as);
+    printf("--------------------\n");
+    printf("> myas  : %d\n", cfg.my_as);
+    printf("> id    : %s\n", inet_ntoa(cfg.router_id));
+    printf("> neighbor_address: %s\n", inet_ntoa(cfg.ne.addr));
+    printf("> remote_as       : %d\n\n", cfg.ne.remote_as);
 
     // Init state.
     state = IDLE_STATE;
@@ -69,37 +69,13 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+/*---------- usage ----------*/
 void usage()
 {
     fprintf(stdout, "./mybgp [JSON FILE]\n");
     fprintf(stdout, "The json file describes the configuration.\n");
 }
 
-/*---------- server ----------*/
-/*
-void server()
-{
-    int i = 0;
-    mode = SERVER_MODE;
-    while(i!=3){
-        state_transition();
-        i++;
-    }
-}
-*/
-
-/*---------- client ----------*/
-/*
-void client()
-{
-    int i = 0;
-    mode = CLIENT_MODE;
-    while(i!=3){
-        state_transition();
-        i++;
-    }
-}
-*/
 
 
 /*---------- state_transition ----------*/
@@ -107,17 +83,25 @@ void state_transition()
 {
     switch(state){
         case IDLE_STATE:
-            tcp_connect();
+            // TCP Connection.
+            tcp_connect();                  // > CONNECT
             break;
         case CONNECT_STATE:
-            process_connect(); 
+            // Send Open Msg.
+            process_connect_sendopen();     // > OPENSENT
             break;
         case OPENSENT_STATE:
-            process_opensent();
+            process_opensent_recvopen();
+            process_opensent_sendkeep();    // > OPENCOFIRM
             break;
         case OPENCONFIRM_STATE:
-            printf("Implemented so far.\n");
-            exit(EXIT_FAILURE);
+            prosecc_openconfirm_recvkeep(); // > ESTABLISHED
+            break;
+        case ESTABLISHED_STATE:
+            printf("ESTAB\n");
+            exit(1);
+            // prosecc_established();
+            // break;
         default:
             fprintf(stderr, "State Error.\n");
             exit(EXIT_FAILURE);
@@ -125,14 +109,10 @@ void state_transition()
 }
 
 
-
 /*---------- tcp_connect ----------*/
 void tcp_connect() 
 {
     unsigned short sPort = 179;     // Port Num
-    // int srcSoc;                     // Src Socketfd
-    // int dstSoc;                     // Dst Socketfd
-    // struct sockaddr_in sa;          // Src param
     struct sockaddr_in da;          // Dst param
 
     // Client side.
@@ -149,7 +129,7 @@ void tcp_connect()
     da.sin_port         = htons(sPort);
 
     /* Connect. */
-    fprintf(stdout, "Trying to connect to %s \n", inet_ntoa(cfg.ne.addr)); 
+    fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg.ne.addr)); 
     connect(soc, (struct sockaddr *) &da, sizeof(da));
 
     /* State transition. */
