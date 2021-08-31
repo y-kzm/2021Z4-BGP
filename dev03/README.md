@@ -64,7 +64,36 @@
   ESTABLISHED!
   ~~~
   
-  ![](../img/estab_r2.png)
+  ~~~
+  ### R2 ###
+  2# sh ip bgp summary 
+
+  IPv4 Unicast Summary:
+  BGP router identifier 2.2.2.2, local AS number 2 vrf-id 0
+  BGP table version 3
+  RIB entries 5, using 800 bytes of memory
+  Peers 1, using 21 KiB of memory
+
+  Neighbor        V         AS MsgRcvd MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd
+  10.255.1.1      4          1       0       0        0    0    0    never       Active
+
+  Total number of neighbors 1
+  
+  ### R1でmybgpを実行した後 ###
+  R2# sh ip bgp summary 
+
+  IPv4 Unicast Summary:
+  BGP router identifier 2.2.2.2, local AS number 2 vrf-id 0
+  BGP table version 3
+  RIB entries 5, using 800 bytes of memory
+  Peers 1, using 21 KiB of memory
+
+  Neighbor        V         AS MsgRcvd MsgSent   TblVer  InQ OutQ  Up/Down State/PfxRcd
+  10.255.1.1      4          1       2       2        0    0    0 00:00:03       Active
+
+  Total number of neighbors 1
+  ~~~
+
 
 ---
 ### Wireshark.
