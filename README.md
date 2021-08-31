@@ -9,7 +9,9 @@ Yokoo Kazuma
   - 一方的にOPEN Messageを送信する  
   - wiresharkでOPEN Msgを確認  
 - dev03/ 
-  - dev02/をもとに拡張
-  - 状態遷移を意識して、OPEN Msgを相互でやりとりできる様に  
+  - 状態遷移を意識して、OPEN Msgを相互でやりとりできる様に 
+  - KEEPALIVE Msg をやりとりし、ESTAB状態まで   
+- dev04/
+  - 
 
 
