@@ -98,5 +98,5 @@
 ---
 ### Wireshark.
 
-  ![](../img/estab_r2_pcap.png)
+  ![](../img/estab_pcap.png)
 
