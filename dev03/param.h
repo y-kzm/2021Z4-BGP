@@ -23,10 +23,6 @@ struct config {
     struct neighbor     ne;
 };
 
-
-// Extern.
-extern struct config    cfg;
-
 // Function.
 struct config
 parse_json(const char *buf, size_t buflen);

@@ -9,7 +9,6 @@
 
 /* Define. */
 #define BUFSIZE    4096
-#define BACK_LOG   5
 
 /* Mode. */
 // Unimplemented.
@@ -20,12 +19,12 @@ enum MODE {
 };
 */
 
-// extern.
-extern int soc;
 
 /* Function */     
-void usage();
-void state_transition();        // Process by state.
-void tcp_connect();             // Establish tcp connection.
+void usage(); 
+// Process by state.
+void state_transition(struct peer *p, struct config cfg);   
+// Establish tcp connection.
+int tcp_connect(struct peer *p, struct config cfg);             
 
 #endif

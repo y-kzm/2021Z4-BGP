@@ -13,13 +13,6 @@
 #include "bgp.h"
 #include "includes.h"
 
-// State
-enum STATE state;
-// Socket.
-int soc;
-// Config.
-struct config   cfg;
-
 
 /*---------- main ----------*/
 // ./mybgp conf.json
@@ -28,6 +21,10 @@ int main(int argc, char *argv[])
     // Variables for reading json file.
     int fd, size;
     char buf[4096];
+    struct config  cfg;
+
+    // BGP peer variables.
+    struct peer p = {IDLE_STATE};
 
     if(argc != 2) {
         fprintf(stderr, "The arguments are different.\n");
@@ -49,21 +46,19 @@ int main(int argc, char *argv[])
         return -1;
     }
     close(fd);
-
-    // Read config.
     cfg = parse_json((const char *)buf, size);
+
     // Debug.
-    printf("Loaded the following settings.\n");
     printf("--------------------\n");
+    printf("Loaded the following settings.\n");
     printf("> myas  : %d\n", cfg.my_as);
     printf("> id    : %s\n", inet_ntoa(cfg.router_id));
     printf("> neighbor_address: %s\n", inet_ntoa(cfg.ne.addr));
     printf("> remote_as       : %d\n\n", cfg.ne.remote_as);
 
-    // Init state.
-    state = IDLE_STATE;
+    // State transition.
     while(1) {
-       state_transition(); 
+       state_transition(&p, cfg); 
     }
 
     return 0;
@@ -79,26 +74,32 @@ void usage()
 
 
 /*---------- state_transition ----------*/
-void state_transition()
+void state_transition(struct peer *p, struct config cfg)
 {
-    switch(state){
+    static int soc;
+    switch(p->state){
         case IDLE_STATE:
-            // TCP Connection.
-            tcp_connect();                  // > CONNECT
+            // Start TCP Connection.       
+            soc = tcp_connect(p, cfg);        
             break;
         case CONNECT_STATE:
+            // If the TCP connection is successful.
             // Send Open Msg.
-            process_connect_sendopen();     // > OPENSENT
+            process_sendopen(soc, p, cfg);
             break;
         case OPENSENT_STATE:
-            process_opensent_recvopen();
-            process_opensent_sendkeep();    // > OPENCOFIRM
+            // Waiting Open Msg.
+            process_recvopen(soc);
+            // If the OPEN message is successful.
+            // Send KEEPALIVE Msg.
+            process_sendkeep(soc, p);
             break;
         case OPENCONFIRM_STATE:
-            prosecc_openconfirm_recvkeep(); // > ESTABLISHED
+            // Waiting KEEPALIVE Msg.
+            prosecc_recvkeep(soc, p);
             break;
         case ESTABLISHED_STATE:
-            printf("ESTAB\n");
+            printf("\nESTABLISHED!\n");
             exit(1);
             // prosecc_established();
             // break;
@@ -110,10 +111,11 @@ void state_transition()
 
 
 /*---------- tcp_connect ----------*/
-void tcp_connect() 
+int tcp_connect(struct peer *p, struct config cfg) 
 {
     unsigned short sPort = 179;     // Port Num
     struct sockaddr_in da;          // Dst param
+    int soc;
 
     // Client side.
     /* Create a socket */
@@ -129,9 +131,12 @@ void tcp_connect()
     da.sin_port         = htons(sPort);
 
     /* Connect. */
+    fprintf(stdout, "--------------------\n");   
     fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg.ne.addr)); 
     connect(soc, (struct sockaddr *) &da, sizeof(da));
 
     /* State transition. */
-    state = CONNECT_STATE;
+    p->state = CONNECT_STATE;
+
+    return soc;
 }
