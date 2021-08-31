@@ -11,7 +11,7 @@ Yokoo Kazuma
 - dev03/ 
   - 状態遷移を意識して、OPEN Msgを相互でやりとりできる様に 
   - KEEPALIVE Msg をやりとりし、ESTAB状態まで   
-- dev04/
+- dev04/  
   - 
 
 
