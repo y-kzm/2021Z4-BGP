@@ -1,0 +1,9 @@
+{
+    "router bgp": 1, 
+    "router-id": "1.1.1.1", 
+    "neighbor": 
+    {
+        "address": "10.255.1.2", 
+        "remote-as": 2
+    }
+}
