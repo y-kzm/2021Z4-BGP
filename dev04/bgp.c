@@ -53,12 +53,12 @@ void process_recvopen(int soc)
 
     /* Recv packets. */
     fprintf(stdout, "--------------------\n");    
-    read(soc, buf, BGP_OPEN_OPT_LEN);  
+    read(soc, buf, BGP_OPEN_OPT_TOTAL_LEN);  
     
     ptr = buf;
 
     bop = (struct bgp_open_opt *)ptr;
-    ptr += BGP_OPEN_OPT_LEN;
+    ptr += BGP_OPEN_OPT_TOTAL_LEN;
     fprintf(stdout, "BGP OPEN MSG RECV...\n");
     fprintf(stdout, "Marker: ");
     for(i=0; i<MARKER_LEN; i++){

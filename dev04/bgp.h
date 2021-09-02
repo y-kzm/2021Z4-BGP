@@ -16,55 +16,98 @@ enum STATE {
 #define NOTIFICATION_MSG  3
 #define KEEPALIVE_MSG     4
 
-/* GBP Peer. */
+/*BGP Peer. */
 struct peer {
     enum STATE state;
 };
 
 /* BGP Header Format. */
 struct bgp_hdr {
-  uint8_t marker[16];  
-  uint16_t len;
-  uint8_t type;
+    uint8_t marker[16];  
+    uint16_t len;
+    uint8_t type;
 } __attribute__((__packed__));
 #define MARKER_LEN  16
 #define BGP_HDR_LEN 19
 
 /* BGP Open Msg Format. */
 struct bgp_open {
-  struct bgp_hdr  hdr; 
-  uint8_t version;
-  uint16_t myas;
-  uint16_t holdtime;
-  struct in_addr id;
-  uint8_t opt_len;
+    struct bgp_hdr  hdr; 
+    uint8_t version;
+    uint16_t myas;
+    uint16_t holdtime;
+    struct in_addr id;
+    uint8_t opt_len;
 } __attribute__((__packed__));
 #define BGP_OPEN_LEN 29
 
 /* BGP Open Msg Opt Format. */
 struct bgp_open_opt {
-  struct bgp_hdr  hdr;
-  uint8_t version;
-  uint16_t myas;
-  uint16_t holdtime;
-  struct in_addr id;
-  uint8_t opt_len;
-  uint8_t opt[46];
+    struct bgp_hdr  hdr;
+    uint8_t version;
+    uint16_t myas;
+    uint16_t holdtime;
+    struct in_addr id;
+    uint8_t opt_len;
+    uint8_t opt[46];
 } __attribute__((__packed__));
-#define BGP_OPEN_OPT_LEN 29+46
+#define BGP_OPEN_OPT_LEN 46
+#define BGP_OPEN_OPT_TOTAL_LEN 75
 
 /* BGP Update Msg Format. */
-/*
 struct bgp_update {
-  struct bgp_hdr  hdr;
+    struct bgp_hdr  hdr;
 
-  uint8_t withdrawn_routes_len;
-  withdrawn_routes[]
-
+    uint8_t withdrawn_routes_len;
+    // withdrawn_routes[]
 } __attribute__((__packed__));
-*/
 
+/* Path Atribute internal structure. */
+struct flags {
+    uint8_t opt: 1;
+    uint8_t trans: 1;
+    uint8_t part: 1;
+    uint8_t ext_len: 1;
+    uint8_t unused: 4;
+};
 
+struct as_path_segment {
+    uint8_t sgmnt_type;
+    uint8_t sgmnt_len 
+    uint32_t sgmnt_value;
+} __attribute__((__packed__));
+
+/* Path Atribute. */
+struct pa_origin {
+    struct flags flags;
+    uint8_t code;
+    uint8_t len;
+    uint8_t origin;
+} __attribute__((__packed__));
+
+struct pa_as_path {
+    struct flags flags;
+    uint8_t code;
+    uint16_t len;
+    struct as_path_segment sgmnt;
+} __attribute__((__packed__));
+
+struct pa_next_hop {
+    struct flags flags;
+    uint8_t code;
+    uint8_t len;
+    struct in_addr nexthop; 
+} __attribute__((__packed__));
+
+struct pa_mult_exit_disc {
+    struct flags flags;
+    uint8_t code;
+    uint8_t len; 
+    uint32_t med;
+} __attribute__((__packed__));
+
+/* NLRI. */
+//...
 
 /* Functon. */
 void process_sendopen(int soc, struct peer *p, struct config cfg);
