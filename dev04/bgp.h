@@ -55,12 +55,14 @@ struct bgp_open_opt {
 #define BGP_OPEN_OPT_TOTAL_LEN 75
 
 /* BGP Update Msg Format. */
+// typedef uint8_t msg[64];
 struct bgp_update {
     struct bgp_hdr  hdr;
-
     uint8_t withdrawn_routes_len;
-    // withdrawn_routes[]
+    uint8_t data[64];
 } __attribute__((__packed__));
+#define BGP_UPDATE_MINLEN 4
+
 
 /* Path Atribute internal structure. */
 struct flags {
@@ -73,7 +75,7 @@ struct flags {
 
 struct as_path_segment {
     uint8_t sgmnt_type;
-    uint8_t sgmnt_len 
+    uint8_t sgmnt_len;
     uint32_t sgmnt_value;
 } __attribute__((__packed__));
 
@@ -107,7 +109,10 @@ struct pa_mult_exit_disc {
 } __attribute__((__packed__));
 
 /* NLRI. */
-//...
+struct nlri {
+  uint8_t prefix_len;
+  struct in_addr prefix;
+} __attribute__((__packed__));
 
 /* Functon. */
 void process_sendopen(int soc, struct peer *p, struct config cfg);

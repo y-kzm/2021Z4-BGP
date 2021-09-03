@@ -99,10 +99,10 @@ void state_transition(struct peer *p, struct config cfg)
             prosecc_recvkeep(soc, p);
             break;
         case ESTABLISHED_STATE:
-            printf("\nESTABLISHED!\n");
-            exit(1);
-            // prosecc_established();
-            // break;
+            // printf("\nESTABLISHED!\n");
+            // exit(1);
+            prosecc_established(soc, p);
+            break;
         default:
             fprintf(stderr, "State Error.\n");
             exit(EXIT_FAILURE);
