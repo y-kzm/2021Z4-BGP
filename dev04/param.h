@@ -25,6 +25,6 @@ struct config {
 
 // Function.
 struct config
-parse_json(const char *buf, size_t buflen);
+*parse_json(const char *buf, size_t buflen);
 
 #endif

@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
     // Variables for reading json file.
     int fd, size;
     char buf[4096];
-    struct config  cfg;
+    struct config  *cfg;
 
     // BGP peer variables.
     struct peer p = {IDLE_STATE};
@@ -51,10 +51,10 @@ int main(int argc, char *argv[])
     // Debug.
     printf("--------------------\n");
     printf("Loaded the following settings.\n");
-    printf("> myas  : %d\n", cfg.my_as);
-    printf("> id    : %s\n", inet_ntoa(cfg.router_id));
-    printf("> neighbor_address: %s\n", inet_ntoa(cfg.ne.addr));
-    printf("> remote_as       : %d\n\n", cfg.ne.remote_as);
+    printf("> myas  : %d\n", cfg->my_as);
+    printf("> id    : %s\n", inet_ntoa(cfg->router_id));
+    printf("> neighbor_address: %s\n", inet_ntoa(cfg->ne.addr));
+    printf("> remote_as       : %d\n\n", cfg->ne.remote_as);
 
     // State transition.
     while(1) {
@@ -74,7 +74,7 @@ void usage()
 
 
 /*---------- state_transition ----------*/
-void state_transition(struct peer *p, struct config cfg)
+void state_transition(struct peer *p, struct config *cfg)
 {
     static int soc;
     switch(p->state){
@@ -96,12 +96,12 @@ void state_transition(struct peer *p, struct config cfg)
             break;
         case OPENCONFIRM_STATE:
             // Waiting KEEPALIVE Msg.
-            prosecc_recvkeep(soc, p);
+            process_recvkeep(soc, p);
             break;
         case ESTABLISHED_STATE:
-            // printf("\nESTABLISHED!\n");
-            // exit(1);
-            prosecc_established(soc, p);
+            process_established(soc, p);
+            printf("Fin.\n");
+            exit(1);
             break;
         default:
             fprintf(stderr, "State Error.\n");
@@ -111,7 +111,7 @@ void state_transition(struct peer *p, struct config cfg)
 
 
 /*---------- tcp_connect ----------*/
-int tcp_connect(struct peer *p, struct config cfg) 
+int tcp_connect(struct peer *p, struct config *cfg) 
 {
     unsigned short sPort = 179;     // Port Num
     struct sockaddr_in da;          // Dst param
@@ -127,12 +127,12 @@ int tcp_connect(struct peer *p, struct config cfg)
     /* Storage of dst param. */
     memset(&da, 0, sizeof(da));
     da.sin_family       = AF_INET;
-    da.sin_addr.s_addr  = cfg.ne.addr.s_addr;  
+    da.sin_addr.s_addr  = cfg->ne.addr.s_addr;  
     da.sin_port         = htons(sPort);
 
     /* Connect. */
     fprintf(stdout, "--------------------\n");   
-    fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg.ne.addr)); 
+    fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg->ne.addr)); 
     connect(soc, (struct sockaddr *) &da, sizeof(da));
 
     /* State transition. */

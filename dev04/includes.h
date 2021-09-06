@@ -8,7 +8,8 @@
 #include <netdb.h>
 
 /* Define. */
-#define BUFSIZE    4096
+#define BUFSIZE     4096
+#define BYTE_SIZE   8
 
 /* Mode. */
 // Unimplemented.
@@ -23,8 +24,8 @@ enum MODE {
 /* Function */     
 void usage(); 
 // Process by state.
-void state_transition(struct peer *p, struct config cfg);   
+void state_transition(struct peer *p, struct config *cfg);   
 // Establish tcp connection.
-int tcp_connect(struct peer *p, struct config cfg);             
+int tcp_connect(struct peer *p, struct config *cfg);             
 
 #endif

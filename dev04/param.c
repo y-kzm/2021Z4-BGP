@@ -9,7 +9,7 @@
 #include "param.h"
 
 struct config
-parse_json(const char *buf, size_t buflen)
+*parse_json(const char *buf, size_t buflen)
 {
     // Variable to hold JSON objects.
     json_error_t error;
@@ -18,7 +18,7 @@ parse_json(const char *buf, size_t buflen)
     const char *str;
     int value;
 
-    struct config cfg;
+    struct config *cfg = malloc(sizeof(*cfg));
 
     // Read the entire JSON buffer.
     root = json_loadb(buf, buflen, 0, &error);
@@ -31,14 +31,14 @@ parse_json(const char *buf, size_t buflen)
     obj = json_object_get(root, "router bgp");
     if(json_is_integer(obj)) {
         value = json_integer_value(obj);
-        cfg.my_as = value; 
+        cfg->my_as = value; 
         // printf("router bgp: %d\n", value);
     }
 
     obj = json_object_get(root, "router-id");
     if(json_is_string(obj)) {
         str = json_string_value(obj);
-        inet_aton(str, &cfg.router_id);
+        inet_aton(str, &cfg->router_id);
         // printf("router-id: %s\n", str);
     }
 
@@ -51,14 +51,14 @@ parse_json(const char *buf, size_t buflen)
         obj_ne = json_object_get(obj, "address");
         if(json_is_string(obj_ne)) {
             str = json_string_value(obj_ne);
-            inet_aton(str, &cfg.ne.addr);
+            inet_aton(str, &cfg->ne.addr);
             // printf("neighbor address: %s\n", str); 
         }
 
         obj_ne = json_object_get(obj, "remote-as");
         if(json_is_integer(obj_ne)) {
             value = json_integer_value(obj_ne);
-            cfg.ne.remote_as = value;
+            cfg->ne.remote_as = value;
             // printf("remote-as: %d\n", value); 
         }
     }

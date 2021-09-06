@@ -11,13 +11,13 @@
 #include "includes.h"
 
 /*
-    >>>>    SEND or RECV MSG.    <<<<
+    >>>>    SEND RECV MSG.    <<<<
 */
 /*---------- process_sendopen ----------*/
-void process_sendopen(int soc, struct peer *p, struct config cfg)
+void process_sendopen(int soc, struct peer *p, struct config *cfg)
 {
     struct bgp_open bo;
-    int i, size;
+    int i;
     unsigned char buf[BUFSIZE];
 
     /* Set header. */
@@ -29,9 +29,9 @@ void process_sendopen(int soc, struct peer *p, struct config cfg)
     
     /* Set open message. */
     bo.version = 4;
-    bo.myas = htons(cfg.my_as);
+    bo.myas = htons(cfg->my_as);
     bo.holdtime = htons(180);
-    bo.id.s_addr = cfg.router_id.s_addr;
+    bo.id.s_addr = cfg->router_id.s_addr;
     bo.opt_len = 0;
 
     memcpy(buf, &bo, BGP_OPEN_LEN);
@@ -40,7 +40,7 @@ void process_sendopen(int soc, struct peer *p, struct config cfg)
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending OPEN MSG...\n\n"); 
   
-    size = write(soc, buf, BGP_OPEN_LEN);
+    write(soc, buf, BGP_OPEN_LEN);
 
     /* State transition. */
     p->state = OPENSENT_STATE;
@@ -104,7 +104,7 @@ void process_sendkeep(int soc, struct peer *p)
 }
 
 /*---------- process_recvkeep ----------*/
-void prosecc_recvkeep(int soc, struct peer *p)
+void process_recvkeep(int soc, struct peer *p)
 {
     struct bgp_hdr     *keep;
     unsigned char *ptr;
@@ -133,27 +133,31 @@ void prosecc_recvkeep(int soc, struct peer *p)
 /*---------- process_sendupdate ----------*/
 void process_sendupdate(int soc)
 {
-    struct bgp_update *bu;
+    struct bgp_update bu;
     // Path Attrib.
     struct pa_origin origin;
     struct pa_as_path as_path;
     struct pa_next_hop next_hop;
     struct pa_multi_exit_disc med;
+    struct nlri nlri;
     uint8_t *ptr; 
     int i;
     unsigned char buf[BUFSIZE];
+    
 
     /* Set header. */
     for(i=0; i<MARKER_LEN; i++){
         bu.hdr.marker[i] = 255;
     }
-    // bu.hdr.len = htons(BGP_HDR_LEN);
+    bu.hdr.len = htons(55);    // とりあえず固定 
     bu.hdr.type = UPDATE_MSG;
-
-    ptr = bu->data;
-
     /* Set update msg. */
     bu.withdrawn_routes_len = 0;        // とりあえず固定
+    // Total Path Attrib Len.       
+    bu.total_pa_len = htons(28);     // とりあえず固定
+
+    ptr = bu.contents;
+
     // origin.
     store_origin(&origin);
     memcpy(ptr, &origin, sizeof(origin));
@@ -167,27 +171,95 @@ void process_sendupdate(int soc)
     memcpy(ptr, &next_hop, sizeof(next_hop));
     ptr += sizeof(next_hop);
     // med.
-    store_next_hop(&med);
+    store_med(&med);
     memcpy(ptr, &med, sizeof(med));
     ptr += sizeof(med);
-    // Total Path Attrib Len.
     
-
     // NLRI.
+    store_nlri(&nlri);
+    memcpy(ptr, &nlri, sizeof(nlri));
+    ptr += sizeof(uint32_t);
 
-
-
-    // memcpy(buf, &keep, BGP_HDR_LEN);
+    memcpy(buf, &bu, 55);
     /* Send packets */
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending UPDATE MSG...\n\n"); 
   
-    write(soc, buf, );
+    write(soc, buf, 55);     // 55: とりあえず固定
 }
 
 /*
     >>>>    SET PATH ATTRIB.    <<<<
 */
+/*---------- origin ----------*/
+void store_origin(struct pa_origin *origin)
+{
+    // flags: 0100 0000
+    origin->flags = 0x40;
+    // code: ORIGIN (1)
+    origin->code = ORIGIN;
+    // Length
+    origin->len = 1;
+    // origin: INCOMPLETE (2)
+    origin->origin = ORIGIN_INCOMPLETE;
+}
+
+/*---------- as_path ----------*/
+void store_as_path(struct pa_as_path *as_path)
+{
+    // flags: 0101 0000
+    as_path->flags = 0x50;
+    // code: AS_PATH (2)
+    as_path->code = AS_PATH;
+    // Length
+    as_path->len = htons(6);    // 16bit
+    // segment:  
+    as_path->sgmnt.sgmnt_type = AS_SEQUENCE;
+    as_path->sgmnt.sgmnt_len = 1;
+    as_path->sgmnt.sgmnt_value = htonl(1);  // 32bit
+}
+
+/*---------- next_hop ----------*/
+void store_next_hop(struct pa_next_hop *next_hop)
+{
+    // flags: 0100 0000
+    next_hop->flags = 0x40;
+    // code: NEXT_HOP (3)
+    next_hop->code = NEXT_HOP;
+    // Length
+    next_hop->len = 4;
+    // nexthop: 10.255.1.1
+    next_hop->nexthop.s_addr = inet_addr("10.255.1.1");     // cfgから
+}
+
+/*---------- med ----------*/
+void store_med(struct pa_multi_exit_disc *med)
+{
+    // flags: 1000 0000
+    med->flags = 0x80;
+    // code: MULTI_EXIT_DISC (4)
+    med->code = MULTI_EXIT_DISC;
+    // Length
+    med->len = 4;
+    // med
+    med->med = 0;
+}
+
+/*---------- nlri ----------*/
+void store_nlri(struct nlri *nlri)
+{
+    u_int32_t addr = inet_addr("10.1.0.0");
+    int len = 24;
+
+    uint8_t *block;
+    block = &addr;
+    int i;
+    nlri->prefix_len = len;
+    for(i = 0; i < (len + (BYTE_SIZE - 1) / BYTE_SIZE); i++ ) {
+        nlri->prefix[i] = *block;
+        block += sizeof(uint8_t);
+    }
+}
 
 /*
     >>>>    SET MSG.    <<<<
@@ -196,6 +268,7 @@ void process_sendupdate(int soc)
 /*
     >>>>    PRINT MSG.    <<<<
 */
+// > 別ファイルかな
 
 
 /*
@@ -207,7 +280,6 @@ void process_established(int soc, struct peer *p)
     struct bgp_hdr     *hdr;
     unsigned char *ptr;
     unsigned char buf[BUFSIZE];
-    int i;
 
     /* Recv packets. */
     fprintf(stdout, "--------------------\n");    
@@ -226,7 +298,7 @@ void process_established(int soc, struct peer *p)
             break;
         case UPDATE_MSG: 
             // update を受け取る関数(debug表示)
-            process_sendupdate();
+            process_sendupdate(soc);
             break;
         case NOTIFICATION_MSG:
             printf("unimplemented\n");
