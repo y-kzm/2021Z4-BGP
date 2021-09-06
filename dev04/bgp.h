@@ -164,6 +164,9 @@ void store_next_hop(struct pa_next_hop *next_hop);
 void store_med(struct pa_multi_exit_disc *med);
 void store_nlri(struct nlri *nlri);
 
+void store_open(struct bgp_open *bo, struct config *cfg);
+void store_keep(struct bgp_hdr *keep);
+
 
 #endif
 

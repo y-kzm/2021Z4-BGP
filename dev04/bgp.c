@@ -17,29 +17,15 @@
 void process_sendopen(int soc, struct peer *p, struct config *cfg)
 {
     struct bgp_open bo;
-    int i;
     unsigned char buf[BUFSIZE];
 
-    /* Set header. */
-    for(i=0; i<MARKER_LEN; i++){
-        bo.hdr.marker[i] = 255;
-    }
-    bo.hdr.len = htons(BGP_OPEN_LEN);
-    bo.hdr.type = OPEN_MSG;
-    
-    /* Set open message. */
-    bo.version = 4;
-    bo.myas = htons(cfg->my_as);
-    bo.holdtime = htons(180);
-    bo.id.s_addr = cfg->router_id.s_addr;
-    bo.opt_len = 0;
-
+    /* Store Open Msg. */
+    store_open(&bo, cfg);
     memcpy(buf, &bo, BGP_OPEN_LEN);
 
     /* Send packets */
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending OPEN MSG...\n\n"); 
-  
     write(soc, buf, BGP_OPEN_LEN);
 
     /* State transition. */
@@ -49,83 +35,46 @@ void process_sendopen(int soc, struct peer *p, struct config *cfg)
 /*---------- process_recvopen ----------*/
 void process_recvopen(int soc)
 {
-    struct bgp_open_opt  *bop;
-    unsigned char *ptr;
     unsigned char buf[BUFSIZE];
-    int i;
 
     /* Recv packets. */
     fprintf(stdout, "--------------------\n");    
     read(soc, buf, BGP_OPEN_OPT_TOTAL_LEN);  
-    
-    ptr = buf;
-
-    bop = (struct bgp_open_opt *)ptr;
-    ptr += BGP_OPEN_OPT_TOTAL_LEN;
     fprintf(stdout, "BGP OPEN MSG RECV...\n");
-    fprintf(stdout, "Marker: ");
-    for(i=0; i<MARKER_LEN; i++){
-        fprintf(stdout, " %x", bop->hdr.marker[i]);
-    } fprintf(stdout, " \n");
-    fprintf(stdout, "Len: %u\n", ntohs(bop->hdr.len));
-    fprintf(stdout, "Type: %u\n", bop->hdr.type);  
 
-    // fprintf(stdout, "\n");
-    fprintf(stdout, "Version: %u\n", bop->version);
-    fprintf(stdout, "MyAS: %u\n", ntohs(bop->myas));
-    fprintf(stdout, "HoldTime: %u\n", ntohs(bop->holdtime));
-    fprintf(stdout, "Id: %s\n", inet_ntoa(bop->id));
-    fprintf(stdout, "Opt_Len: %u\n\n", bop->opt_len);
+    print_open(buf);
 }
 
 /*---------- process_sendkeep ----------*/
 void process_sendkeep(int soc, struct peer *p)
 {
     struct bgp_hdr keep;
-    int i;
     unsigned char buf[BUFSIZE];
 
-    /* Set header. */
-    for(i=0; i<MARKER_LEN; i++){
-        keep.marker[i] = 255;
-    }
-    keep.len = htons(BGP_HDR_LEN);
-    keep.type = KEEPALIVE_MSG;
-    
+    /* Store KeepAlive Msg.*/
+    store_keep(&keep);
     memcpy(buf, &keep, BGP_HDR_LEN);
 
     /* Send packets */
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending KEEPALIVE MSG...\n\n"); 
-  
     write(soc, buf, BGP_HDR_LEN);
 
+    /* State transition. */
     p->state = OPENCONFIRM_STATE;
 }
 
 /*---------- process_recvkeep ----------*/
 void process_recvkeep(int soc, struct peer *p)
 {
-    struct bgp_hdr     *keep;
-    unsigned char *ptr;
     unsigned char buf[BUFSIZE];
-    int i;
 
     /* Recv packets. */
     fprintf(stdout, "--------------------\n");    
     read(soc, buf, BGP_HDR_LEN);  
-    
-    ptr = buf;
-
-    keep = (struct bgp_hdr *)ptr;
-    ptr += BGP_HDR_LEN;
     fprintf(stdout, "BGP KEEPALIVE MSG RECV...\n");
-    fprintf(stdout, "Marker: ");
-    for(i=0; i<MARKER_LEN; i++){
-        fprintf(stdout, " %x", keep->marker[i]);
-    } fprintf(stdout, " \n");
-    fprintf(stdout, "Len: %u\n", ntohs(keep->len));
-    fprintf(stdout, "Type: %u\n", keep->type);  
+
+    print_keep(buf);
 
     p->state = ESTABLISHED_STATE; 
 }
@@ -143,7 +92,6 @@ void process_sendupdate(int soc)
     uint8_t *ptr; 
     int i;
     unsigned char buf[BUFSIZE];
-    
 
     /* Set header. */
     for(i=0; i<MARKER_LEN; i++){
@@ -184,64 +132,63 @@ void process_sendupdate(int soc)
     /* Send packets */
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending UPDATE MSG...\n\n"); 
-  
     write(soc, buf, 55);     // 55: とりあえず固定
 }
 
 /*
-    >>>>    SET PATH ATTRIB.    <<<<
+    >>>>    STORE PATH ATTRIB.    <<<<
 */
 /*---------- origin ----------*/
 void store_origin(struct pa_origin *origin)
 {
-    // flags: 0100 0000
+    // Flags: 0100 0000
     origin->flags = 0x40;
-    // code: ORIGIN (1)
+    // Code: ORIGIN (1)
     origin->code = ORIGIN;
     // Length
     origin->len = 1;
-    // origin: INCOMPLETE (2)
+    // Origin: INCOMPLETE (2)
     origin->origin = ORIGIN_INCOMPLETE;
 }
 
 /*---------- as_path ----------*/
 void store_as_path(struct pa_as_path *as_path)
 {
-    // flags: 0101 0000
+    // Flags: 0101 0000
     as_path->flags = 0x50;
-    // code: AS_PATH (2)
+    // Code: AS_PATH (2)
     as_path->code = AS_PATH;
     // Length
-    as_path->len = htons(6);    // 16bit
-    // segment:  
+    as_path->len = htons(6); 
+    // Segment:  
     as_path->sgmnt.sgmnt_type = AS_SEQUENCE;
     as_path->sgmnt.sgmnt_len = 1;
-    as_path->sgmnt.sgmnt_value = htonl(1);  // 32bit
+    as_path->sgmnt.sgmnt_value = htonl(1); 
 }
 
 /*---------- next_hop ----------*/
 void store_next_hop(struct pa_next_hop *next_hop)
 {
-    // flags: 0100 0000
+    // Flags: 0100 0000
     next_hop->flags = 0x40;
-    // code: NEXT_HOP (3)
+    // Code: NEXT_HOP (3)
     next_hop->code = NEXT_HOP;
     // Length
     next_hop->len = 4;
-    // nexthop: 10.255.1.1
+    // NextHop: 10.255.1.1
     next_hop->nexthop.s_addr = inet_addr("10.255.1.1");     // cfgから
 }
 
 /*---------- med ----------*/
 void store_med(struct pa_multi_exit_disc *med)
 {
-    // flags: 1000 0000
+    // Flags: 1000 0000
     med->flags = 0x80;
-    // code: MULTI_EXIT_DISC (4)
+    // Code: MULTI_EXIT_DISC (4)
     med->code = MULTI_EXIT_DISC;
     // Length
     med->len = 4;
-    // med
+    // Med
     med->med = 0;
 }
 
@@ -262,13 +209,42 @@ void store_nlri(struct nlri *nlri)
 }
 
 /*
-    >>>>    SET MSG.    <<<<
+    >>>>    STORE MSG.    <<<<
 */
+/*---------- Open Msg.----------*/
+void store_open(struct bgp_open *bo, struct config *cfg)
+{
+    int i;
 
-/*
-    >>>>    PRINT MSG.    <<<<
-*/
-// > 別ファイルかな
+    /* Set header. */
+    for(i=0; i<MARKER_LEN; i++){
+        bo->hdr.marker[i] = 255;
+    }
+    bo->hdr.len = htons(BGP_OPEN_LEN);
+    bo->hdr.type = OPEN_MSG;
+    
+    /* Set open message. */
+    bo->version = 4;
+    bo->myas = htons(cfg->my_as);
+    bo->holdtime = htons(180);
+    bo->id.s_addr = cfg->router_id.s_addr;
+    bo->opt_len = 0;
+}
+
+/*---------- KeppAlive Msg.----------*/
+void store_keep(struct bgp_hdr *keep)
+{
+    int i;
+
+    /* Set header. */
+    for(i=0; i<MARKER_LEN; i++){
+        keep->marker[i] = 255;
+    }
+    keep->len = htons(BGP_HDR_LEN);
+    keep->type = KEEPALIVE_MSG;
+}
+
+/*---------- Update Msg.----------*/
 
 
 /*
@@ -292,12 +268,12 @@ void process_established(int soc, struct peer *p)
     switch(hdr->type) {
         case KEEPALIVE_MSG: 
             fprintf(stdout, "BGP KEEPALIVE MSG RECV...\n");
-            // keep を受け取る関数(debug表示) > 既存のはreadからあるから使いづらい?
-            // recv, send関数のset部やprint部を別の関数にする？
+            print_keep(buf);
             process_sendkeep(soc, p);
             break;
         case UPDATE_MSG: 
-            // update を受け取る関数(debug表示)
+            fprintf(stdout, "BGP UPDATE MSG RECV...\n");
+            print_update(buf);
             process_sendupdate(soc);
             break;
         case NOTIFICATION_MSG:

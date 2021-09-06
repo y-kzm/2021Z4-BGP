@@ -23,9 +23,12 @@ enum MODE {
 
 /* Function */     
 void usage(); 
-// Process by state.
 void state_transition(struct peer *p, struct config *cfg);   
-// Establish tcp connection.
-int tcp_connect(struct peer *p, struct config *cfg);             
+int tcp_connect(struct peer *p, struct config *cfg);       
+
+// Print.
+void print_open(unsigned char *data);
+void print_keep(unsigned char *data);
+void print_update(unsigned char *data);
 
 #endif
