@@ -22,6 +22,24 @@ enum STATE {
 #define NEXT_HOP        3
 #define MULTI_EXIT_DISC 4
 
+/* Path Attribute Origin. */
+#define ORIGIN_IGP          0;
+#define OROGON_EGP          1;
+#define ORIGIN_INCOMPLETE   2;
+
+/* Path Attribute AS_Path Segment Types. */
+#define AS_SET              1;
+#define AS_SEQUENCE         2;
+#define AS_CONFED_SEQUENCE  3;
+#define AS_CONFED_SET       4;
+
+/* BGP Message Length. */
+#define MARKER_LEN              16
+#define BGP_HDR_LEN             19
+#define BGP_OPEN_LEN            29
+#define BGP_OPEN_OPT_LEN        46
+#define BGP_OPEN_OPT_TOTAL_LEN  75
+
 /*BGP Peer. */
 struct peer {
     enum STATE state;
@@ -30,15 +48,15 @@ struct peer {
 
 
 
-
+/*
+    >>>>    Msg Format.    <<<<
+*/
 /* BGP Header Format. */
 struct bgp_hdr {
     uint8_t marker[16];  
     uint16_t len;
     uint8_t type;
 } __attribute__((__packed__));
-#define MARKER_LEN  16
-#define BGP_HDR_LEN 19
 
 /* BGP Open Msg Format. */
 struct bgp_open {
@@ -49,7 +67,6 @@ struct bgp_open {
     struct in_addr id;
     uint8_t opt_len;
 } __attribute__((__packed__));
-#define BGP_OPEN_LEN 29
 
 /* BGP Open Msg Opt Format. */
 struct bgp_open_opt {
@@ -61,38 +78,39 @@ struct bgp_open_opt {
     uint8_t opt_len;
     uint8_t opt[46];
 } __attribute__((__packed__));
-#define BGP_OPEN_OPT_LEN 46
-#define BGP_OPEN_OPT_TOTAL_LEN 75
 
 /* BGP Update Msg Format. */
-// typedef uint8_t msg[64];
+struct withdrawn_routes {
+    uint16_t len;
+    uint8_t routes[];
+};
+struct total_path_attrib {
+    uint16_t total_len;
+    uint8_t path_attrib[];
+};
 struct bgp_update {
     struct bgp_hdr  hdr;
-    uint16_t withdrawn_routes_len;
-    // truct nlri withdrawn_routes[32];   // sizeどうするの?
-    uint16_t total_pa_len;
-    // uint8_t pa[64];     // size
-    // struct nlri nlri[32];   // size
     uint8_t contents[64];
+        /*  ~ Memo. ~
+            > uint16_t  withdrawn_routes_len;
+            > uint8_t   withdrawn_routes[variable]
+            > uint16_t  total_path_len
+            > uint8_t   path_attrib[variable]
+            > uint8_t   nlri[varriable] 
+        */
 } __attribute__((__packed__));
 
 
 
 
-
-/* Path Atribute internal structure. */
-// ビットフィールドは、上から読まれるか、下から読めれるかという環境依存が大きい
-// > ビット演算を使う方が良い
-/*
-struct flags {
-    uint8_t opt: 1;
-    uint8_t trans: 1;
-    uint8_t part: 1;
-    uint8_t ext_len: 1;
-    uint8_t unused: 4;
-};
+/* 
+    >>>>    Path Atribute.    <<<< 
 */
-
+    /*  ~ Memo. ~
+        flagsをビットフィールドを用いた構造体で定義していた.
+        ビットフィールドは"上から読まれる"か、"下から読まれるか"という環境依存が大きい.
+    */
+/* Path Atrib internal structure. */
 struct as_path_segment {
     uint8_t sgmnt_type;
     uint8_t sgmnt_len;
@@ -105,20 +123,13 @@ struct nlri {
   uint8_t prefix[4];
 } __attribute__((__packed__));
 
-
-
-
-
-/* Path Atribute. */
+/* Path Attrib. */
 struct pa_origin {
     uint8_t flags;
     uint8_t code;
     uint8_t len;
     uint8_t origin;
 } __attribute__((__packed__));
-#define ORIGIN_IGP          0;
-#define OROGON_EGP          1;
-#define ORIGIN_INCOMPLETE   2;
 
 struct pa_as_path {
     uint8_t flags;
@@ -126,10 +137,6 @@ struct pa_as_path {
     uint16_t len;
     struct as_path_segment sgmnt;
 } __attribute__((__packed__));
-#define AS_SET              1;
-#define AS_SEQUENCE         2;
-#define AS_CONFED_SEQUENCE  3;
-#define AS_CONFED_SET       4;
 
 struct pa_next_hop {
     uint8_t flags;
@@ -150,7 +157,9 @@ struct pa_multi_exit_disc {
 
 
 
-/* Functon. */
+/* 
+    >>>>    Functons.    <<<< 
+*/
 void process_sendopen(int soc, struct peer *p, struct config *cfg);
 void process_recvopen(int soc);
 void process_sendkeep(int soc, struct peer *p);
@@ -166,6 +175,7 @@ void store_nlri(struct nlri *nlri);
 
 void store_open(struct bgp_open *bo, struct config *cfg);
 void store_keep(struct bgp_hdr *keep);
+void store_update(struct bgp_update *bu);
 
 
 #endif

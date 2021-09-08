@@ -64,6 +64,7 @@ void print_update(unsigned char *data)
     } fprintf(stdout, " \n");
     fprintf(stdout, "Len: %u\n", ntohs(bu->hdr.len));
     fprintf(stdout, "Type: %u\n", bu->hdr.type); 
+    printf("Continuation not implemented.\n\n");
 }
 
 

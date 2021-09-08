@@ -83,52 +83,11 @@ void process_recvkeep(int soc, struct peer *p)
 void process_sendupdate(int soc)
 {
     struct bgp_update bu;
-    // Path Attrib.
-    struct pa_origin origin;
-    struct pa_as_path as_path;
-    struct pa_next_hop next_hop;
-    struct pa_multi_exit_disc med;
-    struct nlri nlri;
-    uint8_t *ptr; 
-    int i;
     unsigned char buf[BUFSIZE];
 
-    /* Set header. */
-    for(i=0; i<MARKER_LEN; i++){
-        bu.hdr.marker[i] = 255;
-    }
-    bu.hdr.len = htons(55);    // とりあえず固定 
-    bu.hdr.type = UPDATE_MSG;
-    /* Set update msg. */
-    bu.withdrawn_routes_len = 0;        // とりあえず固定
-    // Total Path Attrib Len.       
-    bu.total_pa_len = htons(28);     // とりあえず固定
-
-    ptr = bu.contents;
-
-    // origin.
-    store_origin(&origin);
-    memcpy(ptr, &origin, sizeof(origin));
-    ptr += sizeof(origin);
-    // as path.
-    store_as_path(&as_path);
-    memcpy(ptr, &as_path, sizeof(as_path));
-    ptr += sizeof(as_path);
-    // next hop.
-    store_next_hop(&next_hop);
-    memcpy(ptr, &next_hop, sizeof(next_hop));
-    ptr += sizeof(next_hop);
-    // med.
-    store_med(&med);
-    memcpy(ptr, &med, sizeof(med));
-    ptr += sizeof(med);
-    
-    // NLRI.
-    store_nlri(&nlri);
-    memcpy(ptr, &nlri, sizeof(nlri));
-    ptr += sizeof(uint32_t);
-
+    store_update(&bu);      // lenは固定
     memcpy(buf, &bu, 55);
+
     /* Send packets */
     fprintf(stdout, "--------------------\n");
     fprintf(stdout, "Sending UPDATE MSG...\n\n"); 
@@ -189,7 +148,7 @@ void store_med(struct pa_multi_exit_disc *med)
     // Length
     med->len = 4;
     // Med
-    med->med = 0;
+    med->med = htonl(0);
 }
 
 /*---------- nlri ----------*/
@@ -245,7 +204,92 @@ void store_keep(struct bgp_hdr *keep)
 }
 
 /*---------- Update Msg.----------*/
+void store_update(struct bgp_update *bu)
+{
+    // Path Attrib.
+    struct pa_origin origin;
+    struct pa_as_path as_path;
+    struct pa_next_hop next_hop;
+    struct pa_multi_exit_disc med;
+    struct nlri nlri;
 
+    // Update Msg Members.
+    struct withdrawn_routes *wr;  
+    struct total_path_attrib *tp;
+    
+    // Var.
+    unsigned char *ptr;                 // Used to store the path attribute.
+    unsigned char *data = bu->contents; // Used to store sent data.
+    int i;
+
+    /* Set header. */
+    for(i=0; i<MARKER_LEN; i++){
+        bu->hdr.marker[i] = 255;
+    }
+    bu->hdr.len = htons(55);
+    bu->hdr.type = UPDATE_MSG;
+
+
+    /* Set Update. */
+    /* withdrawn_routes. */
+    // Dynamic range.
+    wr = (struct withdrawn_routes *)malloc(
+        sizeof(struct withdrawn_routes) + sizeof(uint8_t) * 0);
+    wr->len = htons(0);
+    // もし到達不能経路があるならここに処理を追加.
+
+    // withdrawn_routes_len(2byte) + withdrawn_routes(variable) 
+    memcpy(data, wr, sizeof(uint8_t)*(2+0));    
+    data += sizeof(uint8_t)*(2+0);
+
+
+    /* total_path_attrib. */
+    // Dynamic range.
+    tp = (struct total_path_attrib *)malloc(
+        sizeof(struct total_path_attrib) + sizeof(uint8_t) * 28);
+    tp->total_len = htons(28);
+
+    /* Set Path Attrib. */
+    ptr = tp->path_attrib;
+    // origin.
+    store_origin(&origin);
+    memcpy(ptr, &origin, sizeof(origin)); 
+    ptr += sizeof(origin);
+    // as path.
+    store_as_path(&as_path);
+    memcpy(ptr, &as_path, sizeof(as_path));
+    ptr += sizeof(as_path);
+    // next hop.
+    store_next_hop(&next_hop);
+    memcpy(ptr, &next_hop, sizeof(next_hop));
+    ptr += sizeof(next_hop);
+    // med.
+    store_med(&med);
+    memcpy(ptr, &med, sizeof(med));
+    ptr += sizeof(med);
+    
+    // total_len(2byte) + total_len
+    memcpy(data, tp, sizeof(uint8_t)*(2+28));
+    data += sizeof(uint8_t)*(2+28);
+
+
+    /* Set NLRI. */
+    int nlri_len;
+    // nlri_len = update_len - (hdr + wr_len(2byte) + tp_len(2byte)) - total_path_len
+    nlri_len = bu->hdr.len - (19+4) - 0 - 28;
+    // Dynamic range.
+    bu = (struct bgp_update *)malloc(
+        sizeof(struct bgp_update) + sizeof(uint8_t) * nlri_len);
+
+    store_nlri(&nlri);
+    memcpy(data, &nlri, sizeof(nlri) - sizeof(uint8_t)*1);
+    data += sizeof(uint8_t)*nlri_len;
+
+    /* Free. */
+    free(wr);
+    free(tp);
+    free(bu);
+}
 
 /*
     >>>>    STATE PROCESS.    <<<<
