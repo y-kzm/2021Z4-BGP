@@ -120,7 +120,7 @@ int tcp_connect(struct peer *p, struct config *cfg)
     // Client side.
     /* Create a socket */
     if((soc = socket(AF_INET, SOCK_STREAM, 0)) < 0){
-        perror("socket() failed.");
+        perror("socket() failed");
         exit(EXIT_FAILURE);
     } 
 
@@ -133,7 +133,10 @@ int tcp_connect(struct peer *p, struct config *cfg)
     /* Connect. */
     fprintf(stdout, "--------------------\n");   
     fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg->ne.addr)); 
-    connect(soc, (struct sockaddr *) &da, sizeof(da));
+    if(connect(soc, (struct sockaddr *) &da, sizeof(da)) < 0) {
+        perror("connect() failed");
+        exit(EXIT_FAILURE);
+    }
 
     /* State transition. */
     p->state = CONNECT_STATE;

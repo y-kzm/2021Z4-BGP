@@ -158,7 +158,7 @@ void store_nlri(struct nlri *nlri)
     int len = 24;
 
     uint8_t *block;
-    block = &addr;
+    block = (uint8_t *)&addr;
     int i;
     nlri->prefix_len = len;
     for(i = 0; i < (len + (BYTE_SIZE - 1) / BYTE_SIZE); i++ ) {
@@ -275,11 +275,9 @@ void store_update(struct bgp_update *bu)
 
     /* Set NLRI. */
     int nlri_len;
-    // nlri_len = update_len - (hdr + wr_len(2byte) + tp_len(2byte)) - total_path_len
-    nlri_len = bu->hdr.len - (19+4) - 0 - 28;
-    // Dynamic range.
-    bu = (struct bgp_update *)malloc(
-        sizeof(struct bgp_update) + sizeof(uint8_t) * nlri_len);
+    // nlri_len = update_len - 23 - withdrawn_len - total_path_len
+    // 23 = hdr(19byte) + wr_len(2byte) + tp_len(2byte)
+    nlri_len = bu->hdr.len - 23 - 0 - 28;
 
     store_nlri(&nlri);
     memcpy(data, &nlri, sizeof(nlri) - sizeof(uint8_t)*1);
@@ -288,7 +286,6 @@ void store_update(struct bgp_update *bu)
     /* Free. */
     free(wr);
     free(tp);
-    free(bu);
 }
 
 /*

@@ -1,6 +1,6 @@
 #ifndef PARAM_H
 
-/* Include. */
+/* Includes. */
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <sys/stat.h>
@@ -23,7 +23,7 @@ struct config {
     struct neighbor     ne;
 };
 
-// Function.
+/* Function. */
 struct config
 *parse_json(const char *buf, size_t buflen);
 

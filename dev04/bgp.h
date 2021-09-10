@@ -90,7 +90,7 @@ struct total_path_attrib {
 };
 struct bgp_update {
     struct bgp_hdr  hdr;
-    uint8_t contents[64];
+    uint8_t contents[4096];
         /*  ~ Memo. ~
             > uint16_t  withdrawn_routes_len;
             > uint8_t   withdrawn_routes[variable]
