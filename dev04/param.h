@@ -10,8 +10,10 @@
 #include <arpa/inet.h>
 
 /* Deinfe. */
-#define MAX_NEIGH   32
-#define MAX_NETWORK 256
+#define MAX_NEIGH       32
+#define MAX_NETWORK     256
+#define MAX_PATH_ATTRIB 256
+#define MAX_WITHDRAWN   256
 
 /* Config. */
 // router bgp 1

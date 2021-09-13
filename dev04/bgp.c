@@ -92,16 +92,18 @@ void process_sendupdate(int soc, struct config *cfg)
 {
     struct bgp_update bu;
     unsigned char buf[BUFSIZE];
+    //uint16_t update_len;
 
-    store_update(&bu, cfg);      // lenは固定
-    memcpy(buf, &bu, 59);
+    store_update(&bu, cfg); 
+    //update_len = ntohs(bu.hdr.len);
+    memcpy(buf, &bu, ntohs(bu.hdr.len));
 
     /* Send packets */
     fprintf(stdout, "--------------------\n");
     printf("\x1b[36m");
     fprintf(stdout, "Sending UPDATE MSG...\n\n"); 
     printf("\x1b[0m");
-    write(soc, buf, 59);     // 55: とりあえず固定
+    write(soc, buf, ntohs(bu.hdr.len));
 }
 
 /*
@@ -231,19 +233,21 @@ void store_update(struct bgp_update *bu, struct config *cfg)
 
     // Update Msg Members.
     struct withdrawn_routes *wr;  
-    struct total_path_attrib *tp;
+    struct total_path_attrib *tpa;
+    uint8_t total_pa_len;
     
     // Var.
-    unsigned char *ptr;                 // Used to store the path attribute.
-    unsigned char *data = bu->contents; // Used to store sent data.
-    unsigned char *offset = bu->contents;
+    unsigned char *ptr;                         // Used to store the path attribute.
+    unsigned char *data = bu->contents;         // Used to store sent data.
+    unsigned char *offset_whole = bu->contents; // Use to ask for hdr->len.
+    unsigned char *offset;       // Used to find the length of each field.
     int i;
 
     /* Set header. */
     for(i=0; i<MARKER_LEN; i++){
         bu->hdr.marker[i] = 255;
     }
-    bu->hdr.len = htons(59);
+    // bu->hdr.len > Find it at the end of this function.
     bu->hdr.type = UPDATE_MSG;
 
 
@@ -251,23 +255,23 @@ void store_update(struct bgp_update *bu, struct config *cfg)
     /* withdrawn_routes. */
     // Dynamic range.
     wr = (struct withdrawn_routes *)malloc(
-        sizeof(struct withdrawn_routes) + sizeof(uint8_t) * 0);
+        sizeof(struct withdrawn_routes) + sizeof(uint8_t) * MAX_WITHDRAWN);
     wr->len = htons(0);
     // もし到達不能経路があるならここに処理を追加.
 
     // withdrawn_routes_len(2byte) + withdrawn_routes(variable) 
-    memcpy(data, wr, sizeof(uint8_t)*(2+0));    
-    data += sizeof(uint8_t)*(2+0);
+    memcpy(data, wr, sizeof(uint8_t)*(TWOBYTE_FIELD_SIZE+0));    
+    data += sizeof(uint8_t)*(TWOBYTE_FIELD_SIZE+0);
 
 
     /* total_path_attrib. */
     // Dynamic range.
-    tp = (struct total_path_attrib *)malloc(
-        sizeof(struct total_path_attrib) + sizeof(uint8_t) * 64);
-    // tp->total_len = htons(28);
+    tpa = (struct total_path_attrib *)malloc(
+        sizeof(struct total_path_attrib) + sizeof(uint8_t) * MAX_PATH_ATTRIB);
 
     /* Set Path Attrib. */
-    ptr = tp->path_attrib;
+    ptr = tpa->path_attrib;
+    offset = tpa->path_attrib;
     // origin.
     store_origin(&origin);
     memcpy(ptr, &origin, sizeof(origin)); 
@@ -285,32 +289,42 @@ void store_update(struct bgp_update *bu, struct config *cfg)
     memcpy(ptr, &med, sizeof(med));
     ptr += sizeof(med);
 
-    tp->total_len = htons((ptr-data)/sizeof(uint8_t));
-    
-    // total_len(2byte) + total_len
-    memcpy(data, tp, sizeof(uint8_t)*(2+28));
-    data += sizeof(uint8_t)*(2+28);
+    total_pa_len = (ptr-offset) / sizeof(uint8_t);
+    tpa->total_len = htons(total_pa_len);   
+
+    // total_len(2byte) + total_pa_len
+    memcpy(data, tpa, sizeof(uint8_t)*(total_pa_len + TWOBYTE_FIELD_SIZE));
+    data += sizeof(uint8_t)*(total_pa_len + TWOBYTE_FIELD_SIZE);
 
 
-    /* Set NLRI. */
-    int nlri_len;
-    // nlri_len = update_len - 23 - withdrawn_len - total_path_len
-    // 23 = hdr(19byte) + wr_len(2byte) + tp_len(2byte)
-    nlri_len = bu->hdr.len - 23 - 0 - 28;
-    
+    /* Set NLRI. */  
+      /*--- 
+          nlri_len = update_len - 23 - withdrawn_len - total_path_len
+          23 = hdr(19byte) + wr_len(2byte) + tp_len(2byte)
+          > nlri_len = bu->hdr.len - 23 - 0 - 28;
+      ---*/
+    // int nlri_len;  
+    // > Remove comment outs as needed.
+    int a_nlri_len;
+    offset = data;
+
+    // nlri.
     store_nlri(nlri, cfg);
     for (i = 0; i < cfg->networks_num; i ++) {
-        memcpy(data, &nlri[i], sizeof(uint8_t)*4);
-        data += sizeof(uint8_t)*4;
+        // +1 : nlri.prefix_len(1byte);
+        a_nlri_len = ((cfg->networks[i].prefix.len + (BYTE_SIZE - 1)) / BYTE_SIZE) + 1;
+        memcpy(data, &nlri[i], sizeof(uint8_t)*a_nlri_len);
+        data += sizeof(uint8_t)*a_nlri_len;
     }
-    // memcpy(data, &nlri, sizeof(nlri) - sizeof(uint8_t)*1);
-    // data += sizeof(uint8_t)*nlri_len;
+    // nlri_len = (data-offset) / sizeof(uint8_t);
+    // > Remove comment outs as needed.
 
-    // printf("%d\n", (data-offset) / sizeof(uint8_t));
+    /* Find the length of the update msg.. */
+    bu->hdr.len = htons((data-offset_whole) / sizeof(uint8_t) + BGP_HDR_LEN);
 
     /* Free. */
     free(wr);
-    free(tp);
+    free(tpa);
 }
 
 /*

@@ -8,8 +8,9 @@
 #include <netdb.h>
 
 /* Define. */
-#define BUFSIZE     4096
-#define BYTE_SIZE   8
+#define BUFSIZE             4096
+#define BYTE_SIZE           8
+#define TWOBYTE_FIELD_SIZE  2
 
 /* Mode. */
 // Unimplemented.

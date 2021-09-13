@@ -19,7 +19,7 @@
 int main(int argc, char *argv[])
 {
     // Variables for reading json file.
-    int fd, size;
+    int fd, size, i;
     char buf[4096];
     struct config  *cfg;
 
@@ -57,8 +57,10 @@ int main(int argc, char *argv[])
     printf("> id    : %s\n", inet_ntoa(cfg->router_id));
     printf("> neighbor_address: %s\n", inet_ntoa(cfg->neighbors[0].addr));
     printf("> remote_as       : %d\n", cfg->neighbors[0].remote_as);
-    printf("> networks prefix:  %s/%d\n\n", inet_ntoa(cfg->networks[0].prefix.addr), cfg->networks[0].prefix.len);
-    
+    for(i = 0; i < cfg->networks_num; i ++) {
+        printf("> networks prefix[%d]:  %s/%d\n", i, inet_ntoa(cfg->networks[i].prefix.addr), cfg->networks[i].prefix.len);
+    }
+    printf("\n");
 
     // State transition.
     while(1) {
