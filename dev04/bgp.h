@@ -164,18 +164,18 @@ void process_sendopen(int soc, struct peer *p, struct config *cfg);
 void process_recvopen(int soc);
 void process_sendkeep(int soc, struct peer *p);
 void process_recvkeep(int soc, struct peer *p);
-void process_sendupdate(int soc);
-void process_established(int soc, struct peer *p);
+void process_sendupdate(int soc, struct config *cfg);
+void process_established(int soc, struct peer *p, struct config *cfg);
 
 void store_origin(struct pa_origin *origin);
 void store_as_path(struct pa_as_path *as_path);
 void store_next_hop(struct pa_next_hop *next_hop);
 void store_med(struct pa_multi_exit_disc *med);
-void store_nlri(struct nlri *nlri);
+void store_nlri(struct nlri *nlri, struct config *cfg);
 
 void store_open(struct bgp_open *bo, struct config *cfg);
 void store_keep(struct bgp_hdr *keep);
-void store_update(struct bgp_update *bu);
+void store_update(struct bgp_update *bu, struct config *cfg);
 
 
 #endif

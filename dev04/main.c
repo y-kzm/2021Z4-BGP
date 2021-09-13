@@ -46,15 +46,19 @@ int main(int argc, char *argv[])
         return -1;
     }
     close(fd);
+    
     cfg = parse_json((const char *)buf, size);
-
+    
     // Debug.
     printf("--------------------\n");
     printf("Loaded the following settings.\n");
+    // printf("Currently limited to one neighbor...\n");
     printf("> myas  : %d\n", cfg->my_as);
     printf("> id    : %s\n", inet_ntoa(cfg->router_id));
-    printf("> neighbor_address: %s\n", inet_ntoa(cfg->ne.addr));
-    printf("> remote_as       : %d\n\n", cfg->ne.remote_as);
+    printf("> neighbor_address: %s\n", inet_ntoa(cfg->neighbors[0].addr));
+    printf("> remote_as       : %d\n", cfg->neighbors[0].remote_as);
+    printf("> networks prefix:  %s/%d\n\n", inet_ntoa(cfg->networks[0].prefix.addr), cfg->networks[0].prefix.len);
+    
 
     // State transition.
     while(1) {
@@ -99,7 +103,7 @@ void state_transition(struct peer *p, struct config *cfg)
             process_recvkeep(soc, p);
             break;
         case ESTABLISHED_STATE:
-            process_established(soc, p);
+            process_established(soc, p, cfg);
             printf("Fin.\n");
             exit(1);
             break;
@@ -127,12 +131,12 @@ int tcp_connect(struct peer *p, struct config *cfg)
     /* Storage of dst param. */
     memset(&da, 0, sizeof(da));
     da.sin_family       = AF_INET;
-    da.sin_addr.s_addr  = cfg->ne.addr.s_addr;  
+    da.sin_addr.s_addr  = cfg->neighbors[0].addr.s_addr;  
     da.sin_port         = htons(sPort);
 
     /* Connect. */
     fprintf(stdout, "--------------------\n");   
-    fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg->ne.addr)); 
+    fprintf(stdout, "Trying to connect to %s \n\n", inet_ntoa(cfg->neighbors[0].addr)); 
     if(connect(soc, (struct sockaddr *) &da, sizeof(da)) < 0) {
         perror("connect() failed");
         exit(EXIT_FAILURE);

@@ -30,7 +30,7 @@ void print_open(unsigned char *data)
     fprintf(stdout, "Version:  %u\n", bop->version);
     fprintf(stdout, "MyAS:     %u\n", ntohs(bop->myas));
     fprintf(stdout, "HoldTime: %u\n", ntohs(bop->holdtime));
-    fprintf(stdout, "Id:    %s\n", inet_ntoa(bop->id));
+    fprintf(stdout, "Id:       %s\n", inet_ntoa(bop->id));
     fprintf(stdout, "Opt_Len:  %u\n\n", bop->opt_len);
 }
 
