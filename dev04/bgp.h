@@ -114,7 +114,9 @@ struct bgp_update {
 struct as_path_segment {
     uint8_t sgmnt_type;
     uint8_t sgmnt_len;
-    uint32_t sgmnt_value;
+    uint16_t sgmnt_value;   // AS2
+    // sgmnt_value > 可変長
+    // ASN: 65536 ~ 4294967295 > 23456
 } __attribute__((__packed__));
 
 /* NLRI. */

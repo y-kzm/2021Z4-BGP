@@ -106,7 +106,8 @@ void state_transition(struct peer *p, struct config *cfg)
             break;
         case ESTABLISHED_STATE:
             process_established(soc, p, cfg);
-            printf("Fin.\n");
+            sleep(90);
+            printf("FIN.\n");
             exit(1);
             break;
         default:

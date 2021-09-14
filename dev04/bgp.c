@@ -92,10 +92,8 @@ void process_sendupdate(int soc, struct config *cfg)
 {
     struct bgp_update bu;
     unsigned char buf[BUFSIZE];
-    //uint16_t update_len;
 
     store_update(&bu, cfg); 
-    //update_len = ntohs(bu.hdr.len);
     memcpy(buf, &bu, ntohs(bu.hdr.len));
 
     /* Send packets */
@@ -130,11 +128,11 @@ void store_as_path(struct pa_as_path *as_path)
     // Code: AS_PATH (2)
     as_path->code = AS_PATH;
     // Length
-    as_path->len = htons(6); 
+    as_path->len = htons(4);   // AS2 
     // Segment:  
     as_path->sgmnt.sgmnt_type = AS_SEQUENCE;
     as_path->sgmnt.sgmnt_len = 1;
-    as_path->sgmnt.sgmnt_value = htonl(1); 
+    as_path->sgmnt.sgmnt_value = htons(1);  // AS2
 }
 
 /*---------- next_hop ----------*/

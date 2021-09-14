@@ -8,7 +8,8 @@
         "ipv4_unicast": {
             "networks": [
                 { "address": "10.1.0.0", "prefix_len": 24 },
-                { "address": "10.2.0.0", "prefix_len": 24 }
+                { "address": "10.2.0.0", "prefix_len": 24 },
+                { "address": "10.255.1.0", "prefix_len": 24 }
             ]
         }
     }
