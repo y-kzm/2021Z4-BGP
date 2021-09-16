@@ -7,16 +7,16 @@
 
 ---
 ### Usage: 
-~~~
+    ~~~
     $ ./mybgp conf.json 
     The json file describes the configuration.
-~~~
+    ~~~
     
 
 ---
 ### Json File:
 - 記述例.
-~~~
+    ~~~
     {
         "router_bgp": 1, 
         "router_id": "1.1.1.1", 
@@ -33,11 +33,11 @@
             }
         }
     }
-~~~
+    ~~~
 
 ---
 ### 実行例.
-~~~
+    ~~~
     root@R1:/work# ./mybgp conf.json 
     --------------------
     Loaded the following settings.
@@ -226,10 +226,10 @@
     Sending KEEPALIVE MSG...
 
     ^C
-~~~
+    ~~~
 
 * FRR でパス属性が認識されていることを確認.  
-~~~   
+    ~~~   
     ### R2 mybgp実行前 ###
     R2# sh bgp ipv4 
     BGP table version is 3, local router ID is 2.2.2.2, vrf id 0
@@ -264,7 +264,7 @@
     *>                  0.0.0.0                  0         32768 ?
 
     Displayed  5 routes and 6 total paths
-~~~
+    ~~~
 
 ---
 ### Wireshark.
