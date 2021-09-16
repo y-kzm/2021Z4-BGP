@@ -108,14 +108,14 @@ struct config
                         if(json_is_string(obj_net_items)) {
                             str = json_string_value(obj_net_items);
                             inet_aton(str, &cfg->networks[i].prefix.addr);
-                            printf("networks: %s\n", str); 
+                            // printf("networks: %s\n", str); 
                         }
                         // prefix_len.
                         obj_net_items = json_object_get(obj_net, "prefix_len");
                         if(json_is_integer(obj_net_items)) {
                             value = json_integer_value(obj_net_items);
                             cfg->networks[i].prefix.len = value;
-                            printf("networks_len: %d\n", value); 
+                            // printf("networks_len: %d\n", value); 
                         }
                     }
                 }

@@ -14,6 +14,7 @@
 #define MAX_NETWORK     256
 #define MAX_PATH_ATTRIB 256
 #define MAX_WITHDRAWN   256
+#define MAX_NETWORKS    256
 
 /* Config. */
 // router bgp 1

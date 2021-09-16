@@ -101,14 +101,14 @@ void state_transition(struct peer *p, struct config *cfg)
             process_sendkeep(soc, p);
             break;
         case OPENCONFIRM_STATE:
-            // Waiting KEEPALIVE Msg.
-            process_recvkeep(soc, p);
+            // Waiting KEEPALIVE or Nortif Msg.
+            // Timer Start.
+            process_recvkeep(soc, p);  
+            // > Nortification Msg の場合もある.
+            // > process_openconfirm() 的なので switch-case 場合分け.
             break;
         case ESTABLISHED_STATE:
             process_established(soc, p, cfg);
-            sleep(90);
-            printf("FIN.\n");
-            exit(1);
             break;
         default:
             fprintf(stderr, "State Error.\n");

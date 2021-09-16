@@ -110,22 +110,32 @@ struct bgp_update {
         flagsをビットフィールドを用いた構造体で定義していた.
         ビットフィールドは"上から読まれる"か、"下から読まれるか"という環境依存が大きい.
     */
-/* Path Atrib internal structure. */
+/* Path Atrib as_path. */
 struct as_path_segment {
     uint8_t sgmnt_type;
     uint8_t sgmnt_len;
     uint16_t sgmnt_value;   // AS2
-    // sgmnt_value > 可変長
+    // sgmnt_value > 可変長対応可能に！
     // ASN: 65536 ~ 4294967295 > 23456
 } __attribute__((__packed__));
 
 /* NLRI. */
+struct nlri_network {
+    uint8_t prefix_len;
+    uint8_t prefix[4];
+} __attribute__((__packed__));
 struct nlri {
-  uint8_t prefix_len;
-  uint8_t prefix[4];
+    struct nlri_network networks;
 } __attribute__((__packed__));
 
+
+
 /* Path Attrib. */
+struct pa_code {
+    uint8_t flags;
+    uint8_t code;
+} __attribute__((__packed__));
+
 struct pa_origin {
     uint8_t flags;
     uint8_t code;
@@ -173,11 +183,11 @@ void store_origin(struct pa_origin *origin);
 void store_as_path(struct pa_as_path *as_path);
 void store_next_hop(struct pa_next_hop *next_hop);
 void store_med(struct pa_multi_exit_disc *med);
-void store_nlri(struct nlri *nlri, struct config *cfg);
+void store_nlri(struct nlri_network *networks, struct config *cfg, int nlri_mode, int index);
 
 void store_open(struct bgp_open *bo, struct config *cfg);
 void store_keep(struct bgp_hdr *keep);
-void store_update(struct bgp_update *bu, struct config *cfg);
+void store_update(struct bgp_update *bu, struct config *cfg, int index);
 
 
 #endif

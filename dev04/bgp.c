@@ -90,19 +90,24 @@ void process_recvkeep(int soc, struct peer *p)
 /*---------- process_sendupdate ----------*/
 void process_sendupdate(int soc, struct config *cfg)
 {
-    struct bgp_update bu;
+    struct bgp_update bu[cfg->networks_num];
     unsigned char buf[BUFSIZE];
+    int i;
 
-    store_update(&bu, cfg); 
-    memcpy(buf, &bu, ntohs(bu.hdr.len));
+    for(i = 0; i < cfg->networks_num; i ++) {
+        buf[0] = '\0';
+        store_update(&bu[i], cfg, i); 
+        memcpy(buf, &bu[i], ntohs(bu[i].hdr.len));
 
-    /* Send packets */
-    fprintf(stdout, "--------------------\n");
-    printf("\x1b[36m");
-    fprintf(stdout, "Sending UPDATE MSG...\n\n"); 
-    printf("\x1b[0m");
-    write(soc, buf, ntohs(bu.hdr.len));
+        /* Send packets */
+        fprintf(stdout, "--------------------\n");
+        printf("\x1b[36m");
+        fprintf(stdout, "Sending UPDATE MSG [%d]...\n\n", i); 
+        printf("\x1b[0m");
+        write(soc, buf, ntohs(bu[i].hdr.len));
+    }
 }
+
 
 /*
     >>>>    STORE PATH ATTRIB.    <<<<
@@ -121,6 +126,7 @@ void store_origin(struct pa_origin *origin)
 }
 
 /*---------- as_path ----------*/
+// 可変長対応可能に！
 void store_as_path(struct pa_as_path *as_path)
 {
     // Flags: 0101 0000
@@ -132,7 +138,7 @@ void store_as_path(struct pa_as_path *as_path)
     // Segment:  
     as_path->sgmnt.sgmnt_type = AS_SEQUENCE;
     as_path->sgmnt.sgmnt_len = 1;
-    as_path->sgmnt.sgmnt_value = htons(1);  // AS2
+    as_path->sgmnt.sgmnt_value= htons(1);  // AS2
 }
 
 /*---------- next_hop ----------*/
@@ -163,24 +169,37 @@ void store_med(struct pa_multi_exit_disc *med)
 }
 
 /*---------- nlri ----------*/
-void store_nlri(struct nlri *nlri, struct config *cfg)  // int i
+void store_nlri(struct nlri_network *networks, struct config *cfg, int nlri_mode, int index)
 {
     int i, j;
     uint8_t *block;
     uint32_t addr;
     uint8_t prefix_len;
 
-    for (i = 0; i < cfg->networks_num; i ++) {
-        addr = cfg->networks[i].prefix.addr.s_addr;
-        prefix_len = cfg->networks[i].prefix.len;
+    if(nlri_mode) {
+        for (i = 0; i < cfg->networks_num; i ++) {
+            addr = cfg->networks[i].prefix.addr.s_addr;
+            prefix_len = cfg->networks[i].prefix.len;
+
+            block = (uint8_t *)&addr; 
+            networks[i].prefix_len = prefix_len;
+            for(j = 0; j < ((prefix_len + (BYTE_SIZE - 1)) / BYTE_SIZE); j++ ) {
+                networks[i].prefix[j] = *block;
+                block += sizeof(uint8_t);
+            }
+        }
+    } else {
+        addr = cfg->networks[index].prefix.addr.s_addr;
+        prefix_len = cfg->networks[index].prefix.len;
 
         block = (uint8_t *)&addr; 
-        nlri[i].prefix_len = prefix_len;
+        networks[0].prefix_len = prefix_len;
         for(j = 0; j < ((prefix_len + (BYTE_SIZE - 1)) / BYTE_SIZE); j++ ) {
-            nlri[i].prefix[j] = *block;
+            networks[0].prefix[j] = *block;
             block += sizeof(uint8_t);
         }
     }
+
 }
 
 /*
@@ -220,14 +239,14 @@ void store_keep(struct bgp_hdr *keep)
 }
 
 /*---------- Update Msg.----------*/
-void store_update(struct bgp_update *bu, struct config *cfg)
+void store_update(struct bgp_update *bu, struct config *cfg, int index)
 {
     // Path Attrib.
     struct pa_origin origin;
     struct pa_as_path as_path;
     struct pa_next_hop next_hop;
     struct pa_multi_exit_disc med;
-    struct nlri nlri[cfg->networks_num];
+    struct nlri_network networks[cfg->networks_num];
 
     // Update Msg Members.
     struct withdrawn_routes *wr;  
@@ -239,8 +258,9 @@ void store_update(struct bgp_update *bu, struct config *cfg)
     unsigned char *data = bu->contents;         // Used to store sent data.
     unsigned char *offset_whole = bu->contents; // Use to ask for hdr->len.
     unsigned char *offset;       // Used to find the length of each field.
-    int i;
-
+    int i, nlri_mode;            // > 0: Announce the route one by once.
+                                 // > 1: Multiple routes are announced at once.
+    
     /* Set header. */
     for(i=0; i<MARKER_LEN; i++){
         bu->hdr.marker[i] = 255;
@@ -303,19 +323,26 @@ void store_update(struct bgp_update *bu, struct config *cfg)
       ---*/
     // int nlri_len;  
     // > Remove comment outs as needed.
-    int a_nlri_len;
+    int network_len;
+    nlri_mode = 0;
     offset = data;
 
-    // nlri.
-    store_nlri(nlri, cfg);
-    for (i = 0; i < cfg->networks_num; i ++) {
-        // +1 : nlri.prefix_len(1byte);
-        a_nlri_len = ((cfg->networks[i].prefix.len + (BYTE_SIZE - 1)) / BYTE_SIZE) + 1;
-        memcpy(data, &nlri[i], sizeof(uint8_t)*a_nlri_len);
-        data += sizeof(uint8_t)*a_nlri_len;
+    if(nlri_mode) {
+        store_nlri(networks, cfg, nlri_mode, index);
+        for (i = 0; i < cfg->networks_num; i ++) {
+            // +1 : nlri.prefix_len(1byte);
+            network_len = ((cfg->networks[i].prefix.len + (BYTE_SIZE - 1)) / BYTE_SIZE) + 1;
+            memcpy(data, &networks[i], sizeof(uint8_t) * network_len);
+            data += sizeof(uint8_t) * network_len;
+        }
+        // nlri_len = (data-offset) / sizeof(uint8_t);
+        // > Remove comment outs as needed.
+    } else {
+        store_nlri(networks, cfg, nlri_mode, index);
+        network_len = ((cfg->networks[index].prefix.len + (BYTE_SIZE - 1)) / BYTE_SIZE) + 1;
+        memcpy(data, &networks[0], sizeof(uint8_t) * network_len);
+        data += sizeof(uint8_t) * network_len;
     }
-    // nlri_len = (data-offset) / sizeof(uint8_t);
-    // > Remove comment outs as needed.
 
     /* Find the length of the update msg.. */
     bu->hdr.len = htons((data-offset_whole) / sizeof(uint8_t) + BGP_HDR_LEN);
@@ -334,10 +361,26 @@ void process_established(int soc, struct peer *p, struct config *cfg)
     struct bgp_hdr     *hdr;
     unsigned char *ptr;
     unsigned char buf[BUFSIZE];
+    static int update_flag;
 
+    /* Send Packets. */
+        /*--- 
+            > 毎回送るのではない.
+            > 変更分だけ送る.
+            > とりあえず、初回だけ送信する仕様で.
+        ---*/
+    if(update_flag == 0) {
+        process_sendupdate(soc, cfg);
+        // > loop で cfg->networks_num 回送る.
+        update_flag = 1;
+    }
+        
     /* Recv packets. */
+        /*---
+            > ヘッダを参照して msg ごとに場合分け.
+        ---*/
     fprintf(stdout, "--------------------\n");    
-    read(soc, buf, BGP_HDR_LEN); 
+    read(soc, buf, sizeof(buf));  
 
     ptr = buf;
     hdr = (struct bgp_hdr *)ptr;
@@ -349,6 +392,7 @@ void process_established(int soc, struct peer *p, struct config *cfg)
             fprintf(stdout, "Recvd BGP KEEPALIVE MSG...\n");
             printf("\x1b[0m");
             print_keep(buf);
+            // Timer Reset.
             process_sendkeep(soc, p);
             break;
         case UPDATE_MSG: 
@@ -356,10 +400,13 @@ void process_established(int soc, struct peer *p, struct config *cfg)
             fprintf(stdout, "Recvd BGP UPDATE MSG...\n");
             printf("\x1b[0m");
             print_update(buf);
-            process_sendupdate(soc, cfg);
+            // Timer Reset.
             break;
         case NOTIFICATION_MSG:
             printf("unimplemented\n");
+            exit(EXIT_FAILURE);
+        default:   
+            fprintf(stderr, "Unexpected message.\n");
             exit(EXIT_FAILURE);
     }
 }
