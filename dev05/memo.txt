@@ -1,18 +1,15 @@
-# 自作BGPとFRR間でメッセージのやりとりを行う.
-* "sh bgp ipv4 unicast"みたいなのを作る.
-
----
-### Overall composition.: 
-    * main.c  
-        - main()  
-            - jsonファイルのopen.  
-            - state_transition() の周回.  
-        - state_transition()  
-            - BGP STATE ごとの処理.  
-            - 状態遷移関数.  
-        - tcp_connect()  
-            - TCP コネクションを確立.  
-    * bgp.c   
+/*---  
+    >>> 全体構成 <<<
+    * main.c
+        - main()
+            - jsonファイルのopen.
+            - state_transition() の周回.
+        - state_transition()
+            - BGP STATE ごとの処理.
+            - 状態遷移関数.
+        - tcp_connect()
+            - TCP コネクションを確立.
+    * bgp.c
         - process_send"MSG"()
             - BGP MSG 格納関数を呼ぶ.
             - BGP MSG の送信.
@@ -35,5 +32,4 @@
             - 格納した構造体メンバを表示する.
     * param.c
         - jsonファイルの内容を構造体へ格納.
-
-    
+---*/

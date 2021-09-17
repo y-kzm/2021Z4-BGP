@@ -9,6 +9,7 @@ COPY ./main.c   /work/main.c
 COPY ./bgp.c    /work/bgp.c
 COPY ./param.c  /work/param.c
 COPY ./print.c  /work/print.c
+COPY ./analyze.c  /work/analyze.c
 
 COPY ./bgp.h      /work/bgp.h
 COPY ./includes.h /work/includes.h

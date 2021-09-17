@@ -46,7 +46,7 @@ void process_recvopen(int soc)
     fprintf(stdout, "Recvd BGP OPEN MSG...\n");
     printf("\x1b[0m");
 
-    print_open(buf);
+    analyze_open(buf);
 }
 
 /*---------- process_sendkeep ----------*/
@@ -82,7 +82,7 @@ void process_recvkeep(int soc, struct peer *p)
     fprintf(stdout, "Recvd BGP KEEPALIVE MSG...\n");
     printf("\x1b[0m");
 
-    print_keep(buf);
+    analyze_hdr(buf);
 
     p->state = ESTABLISHED_STATE; 
 }
@@ -391,7 +391,7 @@ void process_established(int soc, struct peer *p, struct config *cfg)
             printf("\x1b[35m");
             fprintf(stdout, "Recvd BGP KEEPALIVE MSG...\n");
             printf("\x1b[0m");
-            print_keep(buf);
+            analyze_hdr(buf);
             // Timer Reset.
             process_sendkeep(soc, p);
             break;
@@ -399,7 +399,7 @@ void process_established(int soc, struct peer *p, struct config *cfg)
             printf("\x1b[35m");
             fprintf(stdout, "Recvd BGP UPDATE MSG...\n");
             printf("\x1b[0m");
-            print_update(buf);
+            analyze_update(buf);
             // Timer Reset.
             break;
         case NOTIFICATION_MSG:
