@@ -43,9 +43,8 @@ enum STATE {
 /*BGP Peer. */
 struct peer {
     enum STATE state;
+    int entry_num;
 };
-
-
 
 
 /*
@@ -86,7 +85,7 @@ struct withdrawn_routes {
 };
 struct total_path_attrib {
     uint16_t total_len;
-    uint8_t path_attrib[];
+    uint8_t path_attrib[64];
 };
 struct bgp_update {
     struct bgp_hdr  hdr;
@@ -110,15 +109,6 @@ struct bgp_update {
         flagsをビットフィールドを用いた構造体で定義していた.
         ビットフィールドは"上から読まれる"か、"下から読まれるか"という環境依存が大きい.
     */
-/* Path Atrib as_path. */
-struct as_path_segment {
-    uint8_t sgmnt_type;
-    uint8_t sgmnt_len;
-    uint16_t sgmnt_value;   // AS2
-    // sgmnt_value > 可変長対応可能に！
-    // ASN: 65536 ~ 4294967295 > 23456
-} __attribute__((__packed__));
-
 /* NLRI. */
 struct nlri_network {
     uint8_t prefix_len;
@@ -127,8 +117,6 @@ struct nlri_network {
 struct nlri {
     struct nlri_network networks;
 } __attribute__((__packed__));
-
-
 
 /* Path Attrib. */
 struct pa_code {
@@ -143,6 +131,13 @@ struct pa_origin {
     uint8_t origin;
 } __attribute__((__packed__));
 
+struct as_path_segment {
+    uint8_t sgmnt_type;
+    uint8_t sgmnt_len;
+    uint16_t sgmnt_value[64];   // AS2
+    // sgmnt_value > 可変長対応可能に！
+    // ASN: 65536 ~ 4294967295 > 23456
+} __attribute__((__packed__));
 struct pa_as_path {
     uint8_t flags;
     uint8_t code;
@@ -167,6 +162,23 @@ struct pa_multi_exit_disc {
 
 
 
+/* 
+    >>>>    Table elements.    <<<< 
+*/
+// > https://www.infraexpert.com/study/bgpz12.html 
+struct bgp_table_entry {
+    struct in_addr addr;        // Network
+    uint8_t mask;               // prefix_len
+    struct in_addr nexthop;     // NextHop
+    uint32_t metric;            // Med
+    uint8_t path_sgmnt_len;     // Path Sgmnt Len
+    uint16_t path_sgmnt[64];    // Value > [0]: 1 [1]: 2 ...
+} __attribute__((__packed__));
+
+
+
+
+
 
 
 /* 
@@ -180,15 +192,21 @@ void process_sendupdate(int soc, struct config *cfg);
 void process_established(int soc, struct peer *p, struct config *cfg);
 
 void store_origin(struct pa_origin *origin);
-void store_as_path(struct pa_as_path *as_path);
+int store_as_path(struct pa_as_path *as_path, struct config *cfg);
 void store_next_hop(struct pa_next_hop *next_hop);
 void store_med(struct pa_multi_exit_disc *med);
-void store_nlri(struct nlri_network *networks, struct config *cfg, int nlri_mode, int index);
+void store_nlri(struct nlri_network *network, struct config *cfg, int nlri_mode, int index);
 
 void store_open(struct bgp_open *bo, struct config *cfg);
 void store_keep(struct bgp_hdr *keep);
 void store_update(struct bgp_update *bu, struct config *cfg, int index);
 
+void process_table(
+    struct nlri_network *network, struct pa_next_hop *next_hop, 
+    struct pa_multi_exit_disc *med, struct pa_as_path *as_path,
+    struct bgp_table_entry table[], int index);
+
+void routing_control(struct bgp_table_entry table[], struct peer *p);
 
 #endif
 

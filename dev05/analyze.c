@@ -33,7 +33,7 @@ void analyze_open(unsigned char *data)
 }
 
 /*---------- update ----------*/
-void analyze_update(unsigned char *data)
+void analyze_update(unsigned char *data, struct bgp_table_entry table[], struct peer *p)
 {
     unsigned char *ptr = data;
     struct bgp_update   *bu = (struct bgp_update *)ptr;
@@ -41,9 +41,13 @@ void analyze_update(unsigned char *data)
 
     // Path Attrib.
     struct pa_origin origin;
+    // memset(&origin, 0, sizeof(origin));
     struct pa_as_path as_path;
+    // memset(&as_path, 0, sizeof(as_path));
     struct pa_next_hop next_hop;
+    // memset(&next_hop, 0, sizeof(next_hop));
     struct pa_multi_exit_disc med;
+    // memset(&med, 0, sizeof(med));
     struct nlri_network networks[MAX_NETWORKS];
 
     // Update Msg Members.
@@ -74,7 +78,10 @@ void analyze_update(unsigned char *data)
 
     /* Path Attrib. */
     struct pa_code *pa_code;
-    int as_path_len;
+    int as_path_len = 0;
+    int origin_len = 0;
+    int next_hop_len = 0;
+    int med_len = 0;
     unsigned char *pa_end = ptr;
     pa_end += sizeof(uint8_t) * (ntohs(tpa->total_len));
     while(ptr != pa_end) { 
@@ -83,20 +90,24 @@ void analyze_update(unsigned char *data)
         // printf(">> %u\n", pa_code->code);
         switch(pa_code->code) {
             case ORIGIN:
-                analyze_origin(ptr, &origin);
-                ptr += sizeof(origin);
+                origin = analyze_origin(ptr, &origin, &origin_len);
+                ptr += sizeof(uint8_t) * origin_len;
+                print_origin(&origin); 
                 break;
             case AS_PATH: 
-                as_path_len = analyze_as_path(ptr, &as_path);
+                as_path = analyze_as_path(ptr, &as_path, &as_path_len);
                 ptr += sizeof(uint8_t) * as_path_len;
+                print_as_path(&as_path, as_path.sgmnt.sgmnt_len);
                 break;
             case NEXT_HOP: 
-                analyze_next_hop(ptr, &next_hop);
-                ptr += sizeof(next_hop);
+                next_hop = analyze_next_hop(ptr, &next_hop, &next_hop_len);
+                ptr += sizeof(uint8_t) * next_hop_len;
+                print_next_hop(&next_hop);
                 break;
             case MULTI_EXIT_DISC: 
-                analyze_med(ptr, &med);
-                ptr += sizeof(med);
+                med = analyze_med(ptr, &med, &med_len);
+                ptr += sizeof(uint8_t) * med_len;
+                print_med(&med);
                 break;
             default:
                 fprintf(stderr, "This is an unimplemented path attribute.\n");
@@ -106,7 +117,9 @@ void analyze_update(unsigned char *data)
     }
 
     /* nlri. */
-    int nlri_len, network_len; 
+    int nlri_len = 0;
+    int network_len = 0;
+    int networks_num = 0; 
     unsigned char *nlri_end = ptr;
     i = 0;
 
@@ -114,70 +127,99 @@ void analyze_update(unsigned char *data)
     nlri_len = ntohs(bu->hdr.len) - 23 - ntohs(wr->len) - ntohs(tpa->total_len);
     nlri_end += sizeof(uint8_t) * nlri_len;
     while(ptr < nlri_end) {
-        network_len = analyze_nlri(ptr, &networks[i]);
+        networks[i] = analyze_nlri(ptr, &networks[i], &network_len);
+        print_nlri(&networks[i]);
         ptr += sizeof(uint8_t) * network_len;
         i ++;
+        networks_num ++;
     }
-
     printf("\n");
+    
+    
+    /* Process Table. */
+     for(i = 0; i < as_path.sgmnt.sgmnt_len; i ++) {
+        if(ntohs(as_path.sgmnt.sgmnt_value[i]) == 1) {
+            printf("Warning: ");
+            printf("It does not write to the table because the AS_PATH attribute contains its own AS number.\n\n");
+            p->entry_num = 255;
+            return;
+        }
+    }
+    static int entry_index = 0;
+    for(i = 0; i < networks_num; i ++) {
+        process_table(&networks[i], &next_hop, &med, &as_path, table, entry_index);
+        entry_index ++;
+    }
+    p->entry_num = entry_index;
 }
 
 /*
     >>>>    ANALYZE PATH ATTRIB..    <<<<
 */
 /*---------- analyze_origin ----------*/
-void analyze_origin(unsigned char *data, struct pa_origin *origin)
+struct pa_origin
+analyze_origin(unsigned char *data, struct pa_origin *origin, int *origin_len)
 {
     unsigned char *ptr = data;
     origin = (struct pa_origin *)ptr;
 
-    print_origin(origin);
+    *origin_len = 3 + origin->len;
+    return *origin;
 }
 
 /*---------- analyze_as_path ----------*/
-// 可変長対応可能に！
-int analyze_as_path(unsigned char *data, struct pa_as_path *as_path)
+struct pa_as_path 
+analyze_as_path(unsigned char *data, struct pa_as_path *as_path, int *as_path_len)
 {
     unsigned char *ptr = data;
     as_path = (struct pa_as_path *)ptr;
-
-    print_as_path(as_path);
-
-    return 4 + ntohs(as_path->len);
+    
+    *as_path_len = 4 + ntohs(as_path->len);
+    return *as_path;
 }
 
 /*---------- analyze_next_hop ----------*/
-void analyze_next_hop(unsigned char *data, struct pa_next_hop *next_hop)
+struct pa_next_hop 
+analyze_next_hop(unsigned char *data, struct pa_next_hop *next_hop, int *next_hop_len)
 {
     unsigned char *ptr = data;
     next_hop = (struct pa_next_hop *)ptr;
 
-    print_next_hop(next_hop);
+    *next_hop_len = 3 + next_hop->len;
+    return *next_hop;
 }
 
 /*---------- analyze_med ----------*/
-void analyze_med(unsigned char *data, struct pa_multi_exit_disc *med)
+struct pa_multi_exit_disc
+analyze_med(unsigned char *data, struct pa_multi_exit_disc *med, int *med_len)
 {
     unsigned char *ptr = data;
     med = (struct pa_multi_exit_disc *)ptr;
     
-    print_med(med);
+    *med_len = 3 + med->len;
+    return *med;
 }
 
 /*---------- analyze_nlri ----------*/
-// 改良の余地あり...
-int analyze_nlri(unsigned char *data, struct nlri_network *networks)
+struct nlri_network
+analyze_nlri(unsigned char *data, struct nlri_network *network, int *network_len)
 {
     unsigned char *ptr = data;
-    struct nlri_network *networks_raw = (struct nlri_network *)ptr;
-    int k;
+    int i;
+    struct nlri_network *network_raw = (struct nlri_network *)ptr;
+    int addr_len = (network_raw->prefix_len + (BYTE_SIZE - 1)) / BYTE_SIZE; 
 
-    k = (networks_raw->prefix_len + (BYTE_SIZE - 1)) / BYTE_SIZE;
-    networks->prefix_len = networks_raw->prefix_len;
-
-    print_nlri(networks_raw, networks, k);
+    network->prefix_len = network_raw->prefix_len;
+    for(i = 0; i < IPV4_BLOCKS_NUM; i ++) { 
+        network->prefix[i] = network_raw->prefix[i];
+        if(i > addr_len-1) {
+            network->prefix[i] = 0;
+        }
+    }
+    
 
     // a network len.
-    return 1 + k;
+    *network_len = 1 + addr_len;
+    return *network;
 }
 

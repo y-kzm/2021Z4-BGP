@@ -43,7 +43,7 @@ void process_recvopen(int soc)
     fprintf(stdout, "--------------------\n");    
     read(soc, buf, BGP_OPEN_OPT_TOTAL_LEN);  
     printf("\x1b[35m");
-    fprintf(stdout, "Recvd BGP OPEN MSG...\n");
+    fprintf(stdout, "Recvd OPEN MSG...\n");
     printf("\x1b[0m");
 
     analyze_open(buf);
@@ -79,7 +79,7 @@ void process_recvkeep(int soc, struct peer *p)
     fprintf(stdout, "--------------------\n");    
     read(soc, buf, BGP_HDR_LEN);  
     printf("\x1b[35m");
-    fprintf(stdout, "Recvd BGP KEEPALIVE MSG...\n");
+    fprintf(stdout, "Recvd KEEPALIVE MSG...\n");
     printf("\x1b[0m");
 
     analyze_hdr(buf);
@@ -127,7 +127,7 @@ void store_origin(struct pa_origin *origin)
 
 /*---------- as_path ----------*/
 // 可変長対応可能に！
-void store_as_path(struct pa_as_path *as_path)
+int store_as_path(struct pa_as_path *as_path, struct config *cfg)
 {
     // Flags: 0101 0000
     as_path->flags = 0x50;
@@ -138,7 +138,9 @@ void store_as_path(struct pa_as_path *as_path)
     // Segment:  
     as_path->sgmnt.sgmnt_type = AS_SEQUENCE;
     as_path->sgmnt.sgmnt_len = 1;
-    as_path->sgmnt.sgmnt_value= htons(1);  // AS2
+    as_path->sgmnt.sgmnt_value[0]= htons(cfg->my_as);  // AS2
+
+    return 4 + ntohs(as_path->len);
 }
 
 /*---------- next_hop ----------*/
@@ -295,9 +297,12 @@ void store_update(struct bgp_update *bu, struct config *cfg, int index)
     memcpy(ptr, &origin, sizeof(origin)); 
     ptr += sizeof(origin);
     // as path.
-    store_as_path(&as_path);
-    memcpy(ptr, &as_path, sizeof(as_path));
-    ptr += sizeof(as_path);
+    int as_path_len;
+    as_path_len = store_as_path(&as_path, cfg);
+    memcpy(ptr, &as_path, sizeof(uint8_t) * as_path_len); 
+    ptr += sizeof(uint8_t) * as_path_len; 
+        // memcpy(ptr, &as_path, sizeof(as_path));
+        // ptr += sizeof(as_path);
     // next hop.
     store_next_hop(&next_hop);
     memcpy(ptr, &next_hop, sizeof(next_hop));
@@ -357,11 +362,12 @@ void store_update(struct bgp_update *bu, struct config *cfg, int index)
 */
 /*---------- process_established ----------*/
 void process_established(int soc, struct peer *p, struct config *cfg)
-{
+{   
     struct bgp_hdr     *hdr;
     unsigned char *ptr;
     unsigned char buf[BUFSIZE];
     static int update_flag;
+    struct bgp_table_entry table[64];
 
     /* Send Packets. */
         /*--- 
@@ -389,7 +395,7 @@ void process_established(int soc, struct peer *p, struct config *cfg)
     switch(hdr->type) {
         case KEEPALIVE_MSG: 
             printf("\x1b[35m");
-            fprintf(stdout, "Recvd BGP KEEPALIVE MSG...\n");
+            fprintf(stdout, "Recvd KEEPALIVE MSG...\n");
             printf("\x1b[0m");
             analyze_hdr(buf);
             // Timer Reset.
@@ -397,9 +403,12 @@ void process_established(int soc, struct peer *p, struct config *cfg)
             break;
         case UPDATE_MSG: 
             printf("\x1b[35m");
-            fprintf(stdout, "Recvd BGP UPDATE MSG...\n");
+            fprintf(stdout, "Recvd UPDATE MSG...\n");
             printf("\x1b[0m");
-            analyze_update(buf);
+            analyze_update(buf, table, p);
+            // path_serection(table);
+            if(p->entry_num != 255)
+                routing_control(table, p);
             // Timer Reset.
             break;
         case NOTIFICATION_MSG:
@@ -408,5 +417,61 @@ void process_established(int soc, struct peer *p, struct config *cfg)
         default:   
             fprintf(stderr, "Unexpected message.\n");
             exit(EXIT_FAILURE);
+    }
+}
+
+
+/*
+    >>>>    TABLE.    <<<<
+*/
+/*---------- process_table ----------*/
+void process_table(
+    struct nlri_network *network, struct pa_next_hop *next_hop, 
+    struct pa_multi_exit_disc *med, struct pa_as_path *as_path,
+    struct bgp_table_entry table[], int index)
+{
+    int i;
+    char network_addr[64];
+
+    snprintf(network_addr, 64, "%d.%d.%d.%d", 
+        network->prefix[0], network->prefix[1], network->prefix[2], network->prefix[3]);
+    table[index].addr.s_addr =  inet_addr(network_addr);
+    table[index].mask = network->prefix_len;
+    table[index].nexthop = next_hop->nexthop;
+    table[index].metric = med->med;
+    table[index].path_sgmnt_len = as_path->sgmnt.sgmnt_len;
+    for(i = 0; i < table[index].path_sgmnt_len; i ++) {
+        table[index].path_sgmnt[i] = as_path->sgmnt.sgmnt_value[i];
+    }
+
+    print_table(table, index);
+}
+
+
+
+/*
+    >>>>     ROUTING.    <<<<
+*/
+/*---------- path_serection ----------*/
+
+/*---------- routing_control ----------*/
+void routing_control(struct bgp_table_entry table[], struct peer *p)
+{
+    char command[256];
+    int i = 0;
+  
+    for(i = p->entry_num-1; i < p->entry_num; i ++) {
+        printf(">>> %d\n", p->entry_num);
+        printf(">>> %s \n", inet_ntoa(table[i].nexthop)); 
+        snprintf(command, 256, "ip route add %s/%d via %s", inet_ntoa(table[i].addr), table[i].mask, inet_ntoa(table[i].nexthop));
+        printf(">>> %s\n", command);
+        if(system(command) == -1) {
+            fprintf(stderr, "Faild to system().\n");  
+        }
+        /*
+        if(i == p->entry_num-1)
+            break;
+        i ++;
+        */
     }
 }
