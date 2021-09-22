@@ -215,6 +215,8 @@
     Len:  31
     Type: 2
     Withdrawn Routes Len: 8
+      10.3.0.0/24
+      10.4.0.0/24
     Withdrawn Routes.
     Total Path Len: 0
     
