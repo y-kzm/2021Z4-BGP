@@ -67,7 +67,9 @@ void process_sendkeep(int soc, struct peer *p)
     write(soc, buf, BGP_HDR_LEN);
 
     /* State transition. */
-    p->state = OPENCONFIRM_STATE;
+    if(p->state != ESTABLISHED_STATE) {
+        p->state = OPENCONFIRM_STATE;
+    }
 }
 
 /*---------- process_recvkeep ----------*/
@@ -126,7 +128,6 @@ void store_origin(struct pa_origin *origin)
 }
 
 /*---------- as_path ----------*/
-// 可変長対応可能に！
 int store_as_path(struct pa_as_path *as_path, struct config *cfg)
 {
     // Flags: 0101 0000
@@ -171,7 +172,7 @@ void store_med(struct pa_multi_exit_disc *med)
 }
 
 /*---------- nlri ----------*/
-void store_nlri(struct nlri_network *networks, struct config *cfg, int nlri_mode, int index)
+void store_nlri(struct network *networks, struct config *cfg, int nlri_mode, int index)
 {
     int i, j;
     uint8_t *block;
@@ -248,7 +249,7 @@ void store_update(struct bgp_update *bu, struct config *cfg, int index)
     struct pa_as_path as_path;
     struct pa_next_hop next_hop;
     struct pa_multi_exit_disc med;
-    struct nlri_network networks[cfg->networks_num];
+    struct network networks[cfg->networks_num];
 
     // Update Msg Members.
     struct withdrawn_routes *wr;  
@@ -301,8 +302,6 @@ void store_update(struct bgp_update *bu, struct config *cfg, int index)
     as_path_len = store_as_path(&as_path, cfg);
     memcpy(ptr, &as_path, sizeof(uint8_t) * as_path_len); 
     ptr += sizeof(uint8_t) * as_path_len; 
-        // memcpy(ptr, &as_path, sizeof(as_path));
-        // ptr += sizeof(as_path);
     // next hop.
     store_next_hop(&next_hop);
     memcpy(ptr, &next_hop, sizeof(next_hop));
@@ -321,13 +320,6 @@ void store_update(struct bgp_update *bu, struct config *cfg, int index)
 
 
     /* Set NLRI. */  
-      /*--- 
-          nlri_len = update_len - 23 - withdrawn_len - total_path_len
-          23 = hdr(19byte) + wr_len(2byte) + tp_len(2byte)
-          > nlri_len = bu->hdr.len - 23 - 0 - 28;
-      ---*/
-    // int nlri_len;  
-    // > Remove comment outs as needed.
     int network_len;
     nlri_mode = 0;
     offset = data;
@@ -340,8 +332,6 @@ void store_update(struct bgp_update *bu, struct config *cfg, int index)
             memcpy(data, &networks[i], sizeof(uint8_t) * network_len);
             data += sizeof(uint8_t) * network_len;
         }
-        // nlri_len = (data-offset) / sizeof(uint8_t);
-        // > Remove comment outs as needed.
     } else {
         store_nlri(networks, cfg, nlri_mode, index);
         network_len = ((cfg->networks[index].prefix.len + (BYTE_SIZE - 1)) / BYTE_SIZE) + 1;
@@ -366,26 +356,27 @@ void process_established(int soc, struct peer *p, struct config *cfg)
     struct bgp_hdr     *hdr;
     unsigned char *ptr;
     unsigned char buf[BUFSIZE];
-    static int update_flag;
-    struct bgp_table_entry table[64];
+    static bool flag = true;
+    struct List list;
+
 
     /* Send Packets. */
         /*--- 
             > 毎回送るのではない.
             > 変更分だけ送る.
-            > とりあえず、初回だけ送信する仕様で.
+            > とりあえず初回のみ実行される様に.
         ---*/
-    if(update_flag == 0) {
+    if(flag) {
+        // Create BGP table.
+        InitList(&list);
+        // Advertise "cfg->networks_num" times. 
         process_sendupdate(soc, cfg);
-        // > loop で cfg->networks_num 回送る.
-        update_flag = 1;
+        flag = false;
     }
         
     /* Recv packets. */
-        /*---
-            > ヘッダを参照して msg ごとに場合分け.
-        ---*/
-    fprintf(stdout, "--------------------\n");    
+    // Refer to the header and divide the case by bgp message.
+    fprintf(stdout, "--------------------\n");  
     read(soc, buf, sizeof(buf));  
 
     ptr = buf;
@@ -399,16 +390,16 @@ void process_established(int soc, struct peer *p, struct config *cfg)
             printf("\x1b[0m");
             analyze_hdr(buf);
             // Timer Reset.
+            // Design to return keepalive when received.
+            // Essentially, use a timer.
             process_sendkeep(soc, p);
             break;
         case UPDATE_MSG: 
             printf("\x1b[35m");
             fprintf(stdout, "Recvd UPDATE MSG...\n");
             printf("\x1b[0m");
-            analyze_update(buf, table, p);
-            // path_serection(table);
-            if(p->entry_num != 255)
-                routing_control(table, p);
+            analyze_update(buf, &list);
+            // path_selection(table);
             // Timer Reset.
             break;
         case NOTIFICATION_MSG:
@@ -424,27 +415,79 @@ void process_established(int soc, struct peer *p, struct config *cfg)
 /*
     >>>>    TABLE.    <<<<
 */
-/*---------- process_table ----------*/
-void process_table(
-    struct nlri_network *network, struct pa_next_hop *next_hop, 
+/*---------- alloc_table_entry ----------*/
+struct bgp_table_entry
+*AllocTableEntry(void)
+{
+    return ((struct bgp_table_entry *)calloc(1, sizeof(struct bgp_table_entry)));
+}
+
+/*---------- init_list ----------*/
+void InitList(struct List *list)
+{
+    list->head = list-> tail = AllocTableEntry();
+}
+
+/*---------- process_add_table ----------*/
+void process_add_table(
+    struct network *network, struct pa_next_hop *next_hop, 
     struct pa_multi_exit_disc *med, struct pa_as_path *as_path,
-    struct bgp_table_entry table[], int index)
+    struct List *list)
 {
     int i;
     char network_addr[64];
+    struct bgp_table_entry *new = AllocTableEntry();
 
+    // Change IP addresses from array to dot notation.
     snprintf(network_addr, 64, "%d.%d.%d.%d", 
         network->prefix[0], network->prefix[1], network->prefix[2], network->prefix[3]);
-    table[index].addr.s_addr =  inet_addr(network_addr);
-    table[index].mask = network->prefix_len;
-    table[index].nexthop = next_hop->nexthop;
-    table[index].metric = med->med;
-    table[index].path_sgmnt_len = as_path->sgmnt.sgmnt_len;
-    for(i = 0; i < table[index].path_sgmnt_len; i ++) {
-        table[index].path_sgmnt[i] = as_path->sgmnt.sgmnt_value[i];
+    
+    // Write the necessary information in the table.
+    list->tail->addr.s_addr = inet_addr(network_addr);
+    list->tail->mask = network->prefix_len;
+    list->tail->nexthop = next_hop->nexthop;
+    list->tail->metric = med->med;
+    list->tail->path_sgmnt_len = as_path->sgmnt.sgmnt_len;
+    for(i = 0; i < list->tail->path_sgmnt_len; i ++) {
+        list->tail->path_sgmnt[i] = as_path->sgmnt.sgmnt_value[i];
     }
 
-    print_table(table, index);
+    // Updating pointers.
+    list->tail->next = new;
+    list->tail = new;
+
+    print_table(list);
+}
+
+/*---------- process_del_table ----------*/
+void process_del_table(struct network *network, struct List *list)
+{
+    char del_addr[64];
+    // Change IP addresses from array to dot notation.
+    snprintf(del_addr, 64, "%d.%d.%d.%d", 
+        network->prefix[0], network->prefix[1], network->prefix[2], network->prefix[3]);
+    uint32_t addr = inet_addr(del_addr);
+
+    struct bgp_table_entry *rm_node = list->head; 
+    struct bgp_table_entry *pre_node = rm_node;
+
+    while(rm_node->next != NULL) {
+        if(addr == rm_node->addr.s_addr) {
+            if(rm_node == list->head){
+                list->head = list->head->next;
+                free(rm_node);
+            } else if(rm_node == list->tail){
+                free(rm_node);
+                pre_node->next = list->tail;
+            } else {
+                free(rm_node); 
+                pre_node->next = rm_node->next;
+            }
+        }
+        pre_node = rm_node;
+        rm_node = rm_node->next;
+    }
+    print_table(list);
 }
 
 
@@ -454,24 +497,45 @@ void process_table(
 */
 /*---------- path_serection ----------*/
 
-/*---------- routing_control ----------*/
-void routing_control(struct bgp_table_entry table[], struct peer *p)
+/*---------- routing_add ----------*/
+void routing_add(struct List *list)
 {
     char command[256];
-    int i = 0;
-  
-    for(i = p->entry_num-1; i < p->entry_num; i ++) {
-        printf(">>> %d\n", p->entry_num);
-        printf(">>> %s \n", inet_ntoa(table[i].nexthop)); 
-        snprintf(command, 256, "ip route add %s/%d via %s", inet_ntoa(table[i].addr), table[i].mask, inet_ntoa(table[i].nexthop));
-        printf(">>> %s\n", command);
-        if(system(command) == -1) {
-            fprintf(stderr, "Faild to system().\n");  
+    char addr[64];
+    char nexthop[64];
+    struct bgp_table_entry *p_node = list->head;
+
+    while(p_node->next != NULL) {
+        if(p_node->check == false) {
+            strcpy(addr, inet_ntoa(p_node->addr));
+            strcpy(nexthop, inet_ntoa(p_node->nexthop));
+            snprintf(command, 256, "ip route add %s/%d via %s", addr, p_node->mask, nexthop);
+            printf(">> %s\n", command);
+            if(system(command) == -1) {
+                fprintf(stderr, "Faild to system().\n");  
+            }
+            p_node->check = true;
         }
-        /*
-        if(i == p->entry_num-1)
-            break;
-        i ++;
-        */
+        p_node = p_node->next;
+    }
+    printf("\n");
+    
+}
+
+/*---------- routing_del ----------*/
+void routing_del(struct network *network)
+{
+    char command[256];
+    char del_addr[64];
+
+    // Change IP addresses from array to dot notation.
+    snprintf(del_addr, 64, "%d.%d.%d.%d", 
+        network->prefix[0], network->prefix[1], network->prefix[2], network->prefix[3]);
+    snprintf(command, 256, "ip route del %s/%d", 
+        del_addr, network->prefix_len);
+    printf(">> %s\n", command);
+    if(system(command) == -1) {
+        fprintf(stderr, "Faild to system().\n");  
     }
 }
+

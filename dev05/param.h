@@ -30,7 +30,7 @@ struct prefix {
     struct in_addr addr;
     uint8_t len;
 };
-struct network {
+struct p_network {
     struct prefix prefix;
 };
 
@@ -40,7 +40,7 @@ struct config {
     uint8_t neighbors_num;
     struct neighbor neighbors[MAX_NEIGH];
     uint8_t networks_num;
-    struct network networks[MAX_NETWORK];
+    struct p_network networks[MAX_NETWORK];
 };
 
 /* Function. */

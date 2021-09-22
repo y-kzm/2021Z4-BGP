@@ -1,4 +1,5 @@
 #ifndef BGP_H
+#include <stdbool.h>
 
 /* BGP State */
 enum STATE {
@@ -40,11 +41,15 @@ enum STATE {
 #define BGP_OPEN_OPT_LEN        46
 #define BGP_OPEN_OPT_TOTAL_LEN  75
 
-/*BGP Peer. */
+/* Utilt. */
 struct peer {
     enum STATE state;
-    int entry_num;
 };
+
+struct network {
+    uint8_t prefix_len;
+    uint8_t prefix[4];
+} __attribute__((__packed__));
 
 
 /*
@@ -81,7 +86,7 @@ struct bgp_open_opt {
 /* BGP Update Msg Format. */
 struct withdrawn_routes {
     uint16_t len;
-    uint8_t routes[];
+    struct network routes[256];
 };
 struct total_path_attrib {
     uint16_t total_len;
@@ -110,15 +115,12 @@ struct bgp_update {
         ビットフィールドは"上から読まれる"か、"下から読まれるか"という環境依存が大きい.
     */
 /* NLRI. */
-struct nlri_network {
-    uint8_t prefix_len;
-    uint8_t prefix[4];
-} __attribute__((__packed__));
 struct nlri {
-    struct nlri_network networks;
+    struct network networks;
 } __attribute__((__packed__));
 
 /* Path Attrib. */
+// パス属性の場合分けに使用.
 struct pa_code {
     uint8_t flags;
     uint8_t code;
@@ -173,40 +175,15 @@ struct bgp_table_entry {
     uint32_t metric;            // Med
     uint8_t path_sgmnt_len;     // Path Sgmnt Len
     uint16_t path_sgmnt[64];    // Value > [0]: 1 [1]: 2 ...
+    bool check;                 // F: Still. T: Already set the route.
+    struct bgp_table_entry *next;
 } __attribute__((__packed__));
 
+struct List {
+    struct bgp_table_entry *head;
+    struct bgp_table_entry *tail;
+};
 
-
-
-
-
-
-/* 
-    >>>>    Functons.    <<<< 
-*/
-void process_sendopen(int soc, struct peer *p, struct config *cfg);
-void process_recvopen(int soc);
-void process_sendkeep(int soc, struct peer *p);
-void process_recvkeep(int soc, struct peer *p);
-void process_sendupdate(int soc, struct config *cfg);
-void process_established(int soc, struct peer *p, struct config *cfg);
-
-void store_origin(struct pa_origin *origin);
-int store_as_path(struct pa_as_path *as_path, struct config *cfg);
-void store_next_hop(struct pa_next_hop *next_hop);
-void store_med(struct pa_multi_exit_disc *med);
-void store_nlri(struct nlri_network *network, struct config *cfg, int nlri_mode, int index);
-
-void store_open(struct bgp_open *bo, struct config *cfg);
-void store_keep(struct bgp_hdr *keep);
-void store_update(struct bgp_update *bu, struct config *cfg, int index);
-
-void process_table(
-    struct nlri_network *network, struct pa_next_hop *next_hop, 
-    struct pa_multi_exit_disc *med, struct pa_as_path *as_path,
-    struct bgp_table_entry table[], int index);
-
-void routing_control(struct bgp_table_entry table[], struct peer *p);
 
 #endif
 

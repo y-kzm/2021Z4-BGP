@@ -46,9 +46,12 @@ void print_open(struct bgp_open_opt *bop)
 
 /*---------- print_update ----------*/
 void print_update(
-    struct bgp_update *bu, struct withdrawn_routes *wr, struct total_path_attrib *tpa)
+    struct bgp_update *bu, struct withdrawn_routes *wr, 
+    struct total_path_attrib *tpa, int num,
+    struct network wr_routes[])
 {
     int i;
+    // int num = 0; //////
 
     /* Header. */
     fprintf(stdout, "Marker: ");
@@ -61,10 +64,17 @@ void print_update(
     /* Update msg. */
     fprintf(stdout, "Withdrawn Routes Len: %u\n", ntohs(wr->len));
     // もし到達不能経路があるならprint処理
-    fprintf(stdout, "Total Path Len      : %u\n", ntohs(tpa->total_len)); 
+    if(ntohs(wr->len) != 0) {
+        fprintf(stdout, "Withdrawn Routes.\n");
+        for(i = 0; i < num; i ++)
+            print_withdrawn_routes(&wr_routes[i]);
+    }
+
+    fprintf(stdout, "Total Path Len: %u\n", ntohs(tpa->total_len)); 
     
     /* Path Attrib. */
-    fprintf(stdout, "Path Attributes.\n"); 
+    if(ntohs(tpa->total_len) > 0)
+        fprintf(stdout, "Path Attributes.\n"); 
 }
 
 
@@ -119,7 +129,22 @@ void print_med(struct pa_multi_exit_disc *med)
 }
 
 /*---------- print_nlri ----------*/
-void print_nlri(struct nlri_network *network)
+void print_nlri(struct network *network)
+{
+    int i;
+
+    fprintf(stdout, "  "); 
+    for(i = 0; i < IPV4_BLOCKS_NUM; i ++) { 
+        if(i == IPV4_BLOCKS_NUM-1)
+            fprintf(stdout, "%u", network->prefix[i]); 
+        else 
+            fprintf(stdout, "%u.", network->prefix[i]);
+    }
+    fprintf(stdout, "/%u\n", network->prefix_len); 
+}
+
+/*---------- print_withdrawn_routes ----------*/
+void print_withdrawn_routes(struct network *network)
 {
     int i;
 
@@ -134,28 +159,28 @@ void print_nlri(struct nlri_network *network)
 }
 
 
+
 /*
     >>>>    PRINT TABLE.    <<<<
 */
 /*---------- print_table ----------*/
-void print_table(struct bgp_table_entry table[], int index)
+void print_table(struct List *list)
 {
-    int i = 0, j;
+    int i;
+    struct bgp_table_entry *p_node = list->head;
     
-    printf("+--------------------+-----------------+---------+-------------+\n");
+    printf("\n+--------------------+-----------------+---------+-------------+\n");
     printf("  Network:           | NextHop:        | Metric: | Path:        \n");
-    while(1) {
-        printf("  %-15s/%d ", inet_ntoa(table[i].addr), table[i].mask);   // Network / mask
-        printf("| %-15s ", inet_ntoa(table[i].nexthop));       // Nexthop
-        printf("| %-7d ", table[i].metric);        // Metric
-        printf("| ");      // Path
-        for(j = 0; j < table[index].path_sgmnt_len; j ++) {
-            printf("%d ", ntohs(table[index].path_sgmnt[j]));
+    while(p_node->next != NULL) {
+        printf("  %-15s/%d ", inet_ntoa(p_node->addr), p_node->mask);    // Network / mask
+        printf("| %-15s ", inet_ntoa(p_node->nexthop));                   // Nexthop
+        printf("| %-7d ", p_node->metric);                     // Metric
+        printf("| ");                                           // Path
+        for(i = 0; i < p_node->path_sgmnt_len; i ++) {
+            printf("%d ", ntohs(p_node->path_sgmnt[i]));
         }
+        p_node = p_node->next;
         printf("\n");
-        if(i == index)  
-            break;
-        i ++;
     }
     printf("+--------------------+-----------------+---------+-------------+\n");
 }
