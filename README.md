@@ -1,21 +1,22 @@
-# SecCamp2021 Z4 開発用
-2021_08_07~  
-Yokoo Kazuma  
-
+# SecCamp2021 Z4 My-BGP
+- 2021_08_07-  
+  - Yokoo Kazuma  
 ---
-- /dev01
-  - ソケットを用いたTCP通信でメッセージをやり取りするプログラム  
-- /dev02
-  - 一方的にOPEN Messageを送信する  
-  - wiresharkでOPEN Msgを確認  
-- /dev03
-  - 状態遷移を意識して、OPEN Msgを相互でやりとりできる様に 
-  - KEEPALIVE Msg をやりとりし、ESTAB状態まで 
-- /dev04
-  - Update Msg の交換を実装
-  - pcap 要素を実装
-- /dev05
-  - "sh bgp ipv4 unicast"
-
+- 0x01
+  - Socket通信(TCPでメッセージのやりとり)
+- 0x02
+  - 一方的にOpen Messageを送信
+- 0x03
+  - 状態遷移を意識  
+  - KeepAlive Msg を交換、Estab状態に 
+- 0x04
+  - Update Msg の交換
+  - NLRIとPath Attributeを交換
+- 0x05
+  - 簡易的なRIBを実装  
+  - 経路の追加、削除を実装  
+- 0x06
+  - 2022_01_21-
+  - 久しぶりに改良
 
 
